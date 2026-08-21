@@ -145,7 +145,6 @@ Package names MAY be revised before first publication, but the Service Definitio
 | Pending remote deliveries | local outbox; DSH events remain source history |
 | Cross-session derived memory | Honcho |
 | Current source/artifact truth | repository, files, tests, CI |
-| Evidence-grade claim lineage, if enabled | Trellis or equivalent provenance layer |
 
 Any implementation that lets Honcho drive an agent loop or lets recalled memory override current repository evidence violates this specification.
 
@@ -798,6 +797,5 @@ These require evidence from implementation or the MCP experiment and MUST remain
 - whether project decisions merit an explicit conclusion taxonomy in addition to messages/search;
 - whether an operator-only administration CLI belongs in this repository;
 - whether self-hosted deployments need a bundled MCP worker (subject to AGPL review);
-- whether Trellis references should be attached to Honcho metadata for evidence-bearing decisions;
 - whether safe child-agent memory semantics warrant a separate peer/scope model; and
 - final repository/package license.

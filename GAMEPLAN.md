@@ -23,7 +23,6 @@ DSH must remain the only control plane. Honcho is a memory service used by DSH, 
 | DeepSeek RLM | persistent within an agent session | variables, computation, recursive investigation | trusted cross-session truth or a sandbox |
 | Honcho | cross-session and derived | user preferences, intent, recurring constraints, prior decisions, episodic recall | current-code authority or provenance ledger |
 | Git/files/tests/CI | durable current artifacts | implementation truth and verification | personalized memory |
-| Trellis, when used | durable evidence graph | claim lineage, sources, trust, promotion | conversational personalization |
 
 Large or effectively unbounded context does not remove the need for memory management. It changes the capacity limit, but not relevance, freshness, contradiction handling, identity isolation, evidence quality, or the cost of repeatedly reasoning over everything.
 
@@ -159,7 +158,6 @@ No host patch should be added unless implementation proves that the public DSH l
 - Injecting a full user representation on every model step.
 - Letting subagents automatically train the human peer representation.
 - Exposing session/conclusion deletion to the model by default.
-- Replacing Trellis where content-addressed evidence custody and claim provenance are required.
 
 ## 10. First implementation order
 

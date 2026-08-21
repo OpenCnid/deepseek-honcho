@@ -21,14 +21,12 @@ flowchart LR
     dsh --> rlm["DeepSeek RLM: session-scoped computation"]
     dsh <--> honcho["Honcho: cross-session derived memory"]
     dsh --> git["Git, code, tests, CI: current truth"]
-    dsh -. "optional evidence custody" .-> trellis["Trellis: provenance and claims"]
 ```
 
 - DSH owns the agent loop, policy, model credentials, tools, session log, compaction, and lifecycle.
 - DeepSeek RLM supplies persistent computation inside one agent session. It must re-read current code and artifacts.
 - Honcho learns preferences, recurring intent, prior decisions, and useful cross-session history.
 - Git, files, tests, and CI remain authoritative for the present state of the software.
-- Trellis remains useful when a claim needs evidence-grade lineage, trust, or promotion; Honcho does not replace that job.
 
 ## Documents
 
