@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packageDirs = ['honcho', 'honcho-sdk', 'agent-memory', 'tool-memory', 'bundle']
@@ -20,6 +20,10 @@ interface PackResult {
   name: string
   filename: string
   files: { path: string }[]
+}
+
+function archiveSpec(filename: string): string {
+  return `file:${resolve(filename).replaceAll('\\', '/')}`
 }
 
 function pnpm(args: string[], cwd = workspaceRoot): string {
@@ -80,7 +84,7 @@ try {
   }
   if (expectedNames.size > 0) throw new Error(`missing packages: ${[...expectedNames].join(', ')}`)
 
-  const dependencies = Object.fromEntries([...archives].map(([name, filename]) => [name, pathToFileURL(filename).href]))
+  const dependencies = Object.fromEntries([...archives].map(([name, filename]) => [name, archiveSpec(filename)]))
   Object.assign(dependencies, {
     '@deepseek-ai/cordis': '4.0.1',
     '@deepseek-ai/schemastery': '3.18.1',
@@ -108,13 +112,11 @@ try {
     [
       'packages: []',
       'overrides:',
-      ...[...archives].map(
-        ([name, filename]) => `  ${JSON.stringify(name)}: ${JSON.stringify(pathToFileURL(filename).href)}`,
-      ),
+      ...[...archives].map(([name, filename]) => `  ${JSON.stringify(name)}: ${JSON.stringify(archiveSpec(filename))}`),
       '',
     ].join('\n'),
   )
-  const replacements = Object.fromEntries([...archives].map(([name, filename]) => [name, pathToFileURL(filename).href]))
+  const replacements = Object.fromEntries([...archives].map(([name, filename]) => [name, archiveSpec(filename)]))
   const pnpmfile = join(temporaryRoot, '.pnpmfile.cjs')
   await writeFile(
     pnpmfile,
