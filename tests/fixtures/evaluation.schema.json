@@ -21,6 +21,7 @@
             "enum": [
               "preference",
               "project-isolation",
+              "workspace-isolation",
               "peer-isolation",
               "correction",
               "freshness",
@@ -41,6 +42,7 @@
               "additionalProperties": false,
               "required": ["projectId", "peerId", "agentKind", "role", "text"],
               "properties": {
+                "workspaceId": { "type": "string" },
                 "projectId": { "type": "string" },
                 "peerId": { "type": "string" },
                 "agentKind": { "enum": ["root", "child"] },

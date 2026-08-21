@@ -6,6 +6,7 @@ interface CorpusCase {
   id: string
   category: string
   setup: readonly {
+    workspaceId?: string
     projectId: string
     peerId: string
     agentKind: 'root' | 'child'
@@ -47,7 +48,10 @@ function runCase(testCase: CorpusCase): {
   }
   const eligible = testCase.setup.filter(
     (entry) =>
-      entry.agentKind === 'root' && entry.peerId === testCase.userPeerId && entry.projectId === testCase.projectId,
+      entry.agentKind === 'root' &&
+      (entry.workspaceId ?? testCase.workspaceId) === testCase.workspaceId &&
+      entry.peerId === testCase.userPeerId &&
+      entry.projectId === testCase.projectId,
   )
   const superseded = new Set(
     eligible
@@ -110,7 +114,7 @@ const report = {
   mode: 'deterministic-local-oracle',
   containsConversationContent: false,
   promotionClaimed: false,
-  promotionBlockers: ['live Honcho comparison not run', 'operator retention/deletion approval not recorded'],
+  promotionBlockers: ['live Honcho comparison and fenced cleanup not run'],
   summary: {
     passed: results.filter((result) => result.passed).length,
     failed: results.filter((result) => !result.passed).length,

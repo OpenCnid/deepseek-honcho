@@ -199,23 +199,30 @@ export class HonchoSdkMemory extends HonchoMemory {
   async recall(request: HonchoRecallRequest): Promise<HonchoRecallResult> {
     const started = Date.now()
     await this.prepareRead(request)
-    try {
-      const [representation, messages] = await Promise.all([
-        request.includeUserRepresentation
-          ? withAbort(this.remote.representation(request.scope, request.query, request.maxItems), request.signal)
-          : Promise.resolve(''),
-        withAbort(this.remote.search(request.scope, request.query, request.maxItems), request.signal),
-      ])
-      const items: HonchoRecallItem[] = [
-        ...(representation.length === 0 ? [] : [{ kind: 'representation' as const, text: representation }]),
-        ...messages,
-      ]
-      this.recallLastError = undefined
-      return boundRecall(items, request.maxItems, request.maxCharacters, Date.now() - started)
-    } catch (error: unknown) {
-      this.noteReadFailure(error)
-      throw classifySdkError(error)
+    const [representation, messages] = await Promise.allSettled([
+      request.includeUserRepresentation
+        ? withAbort(this.remote.representation(request.scope, request.query, request.maxItems), request.signal)
+        : Promise.resolve(''),
+      withAbort(this.remote.search(request.scope, request.query, request.maxItems), request.signal),
+    ])
+    if (representation.status === 'rejected' && messages.status === 'rejected') {
+      this.noteReadFailure(representation.reason)
+      throw classifySdkError(representation.reason)
     }
+    const partialFailure =
+      representation.status === 'rejected'
+        ? representation.reason
+        : messages.status === 'rejected'
+          ? messages.reason
+          : undefined
+    this.recallLastError = partialFailure === undefined ? undefined : classifySdkError(partialFailure).code
+    const representationText = representation.status === 'fulfilled' ? representation.value : ''
+    const messageItems = messages.status === 'fulfilled' ? messages.value : []
+    const items: HonchoRecallItem[] = [
+      ...(representationText.length === 0 ? [] : [{ kind: 'representation' as const, text: representationText }]),
+      ...messageItems,
+    ]
+    return boundRecall(items, request.maxItems, request.maxCharacters, Date.now() - started)
   }
 
   async search(request: HonchoRecallRequest): Promise<HonchoRecallResult> {
@@ -358,6 +365,7 @@ export class HonchoSdkMemory extends HonchoMemory {
         dsh_session_id: request.scope.dshSessionId,
         dsh_agent_kind: request.scope.agentKind,
         project_id: request.scope.projectId,
+        human_peer_id: request.scope.userPeerId,
         role: message.role,
         plugin_version: HONCHO_PLUGIN_VERSION,
       },

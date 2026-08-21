@@ -7,7 +7,7 @@ The repository implements two composable paths:
 - Stage A uses DSH's existing MCP client and the DSH-adapted `honcho-memory` skill for evaluation.
 - The native path provides a Cordis Service Definition, the official TypeScript SDK provider, lifecycle capture/recall Consumer, five-tool Consumer, and an optional bundle.
 
-This is not presented as production-ready. The deterministic synthetic evaluation passes, but the promotion gate remains blocked until an isolated live comparison and operator-approved retention/deletion procedures are recorded.
+The deterministic and hosted synthetic evaluations now satisfy the section 22 promotion criteria, including fenced cleanup, while capture and recall remain explicit opt-ins. This is not a claim that Honcho met the raw 1500 ms latency target: the live run passed the specification's clean timeout/fail-open alternative and recorded material asynchronous lag. No package has been published, and the opt-in macOS release-intent job remains required before a first release.
 
 ## Packages
 
@@ -45,9 +45,13 @@ Start with synthetic identities. Keep the real key only in the DSH host environm
 
 ## Evaluation and live tests
 
-`pnpm evaluate` executes the 11 deterministic cases in `tests/fixtures/evaluation-corpus.json` and writes only IDs, booleans, bounds, and aggregate metrics to `evaluation-results/latest.json`. It never writes conversation content. The corpus covers preferences, project and peer isolation, corrections, freshness against current evidence, sparse evidence, stored prompt injection, subagent exclusion, outage/fail-open, and long-history bounds.
+`pnpm evaluate` executes the 12 deterministic cases in `tests/fixtures/evaluation-corpus.json` and writes only IDs, booleans, bounds, and aggregate metrics to `evaluation-results/latest.json`. It never writes conversation content. The corpus covers preferences, workspace/project/peer isolation, corrections, freshness against current evidence, sparse evidence, stored prompt injection, subagent exclusion, outage/fail-open, and long-history bounds.
 
 `pnpm test:e2e` is skipped without `HONCHO_LIVE_TEST=1`. A live run also requires `HONCHO_API_KEY` and `HONCHO_LIVE_WORKSPACE_ID`; it creates unique synthetic peers/projects/sessions and never uses personal memory. It performs no destructive cleanup. Follow the operator procedure in [`docs/operations.md`](./docs/operations.md).
+
+`pnpm evaluate:live` is the full opt-in comparison. With `HONCHO_LIVE_TEST=1` and `HONCHO_LIVE_PROVISION=1`, it writes a cleanup manifest before provisioning two run-prefixed synthetic workspaces, executes the corpus through the native SDK provider, waits boundedly for Honcho processing, and persists only content-free case/latency/token/request/cost-availability evidence. It never cleans up implicitly. After inspection, `HONCHO_LIVE_CLEANUP=1 pnpm cleanup:live` verifies ownership and remote metadata fences, deletes the synthetic sessions/workspaces, verifies absence, and updates the report.
+
+The 2026-08-21 hosted run is summarized in [`docs/live-evaluation-2026-08-21.md`](./docs/live-evaluation-2026-08-21.md). The content-free aggregate records `promotionClaimed: true`; deterministic-only `pnpm evaluate` intentionally continues to claim no live promotion by itself.
 
 ## Trust and runtime boundaries
 

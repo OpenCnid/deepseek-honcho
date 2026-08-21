@@ -13,5 +13,9 @@ The API key remains in the DSH host provider. It is excluded from model messages
 and RLM kernels. This project does not sandbox DSH, tools, Honcho, or DeepSeek RLM; isolate untrusted code with operating
 system or container controls.
 
+On Windows, a persistent per-user `HONCHO_API_KEY` environment variable survives reboot but is not a credential vault:
+other processes running as that Windows user can generally read it. Prefer a dedicated key, restrict the user account,
+and rotate the key after suspected host compromise. Keep live-test provisioning and cleanup flags process-scoped.
+
 Report vulnerabilities privately to the repository maintainers. Do not include live keys, peer IDs, or conversation
 content in reports.

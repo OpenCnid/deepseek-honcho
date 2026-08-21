@@ -107,6 +107,33 @@
       }
     },
     {
+      "id": "different-workspace-no-leak",
+      "category": "workspace-isolation",
+      "workspaceId": "ws_alpha",
+      "userPeerId": "peer_alex",
+      "projectId": "project_red",
+      "setup": [
+        {
+          "workspaceId": "ws_other",
+          "projectId": "project_red",
+          "peerId": "peer_alex",
+          "agentKind": "root",
+          "role": "user",
+          "text": "The other synthetic workspace uses the marker ORCHID-WORKSPACE."
+        }
+      ],
+      "query": "Which workspace marker applies here?",
+      "fault": "none",
+      "expect": {
+        "outcome": "miss",
+        "mustContain": [],
+        "mustNotContain": ["ORCHID-WORKSPACE"],
+        "normalCompletion": true,
+        "maxTokens": 1200,
+        "maxLatencyMs": 1500
+      }
+    },
+    {
       "id": "explicit-correction",
       "category": "correction",
       "workspaceId": "ws_alpha",

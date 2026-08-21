@@ -18,6 +18,6 @@ describe('Milestone 0 bootstrap', () => {
     )
     expect(provenance.upstreams).toContainEqual(expect.objectContaining({ name: '@honcho-ai/sdk', version: '2.3.0' }))
     expect(provenance.upstreams.every((row) => !row.copiedSource)).toBe(true)
-    expect(corpus.cases.map((entry) => entry.id)).toHaveLength(11)
+    expect(corpus.cases.map((entry) => entry.id)).toHaveLength(12)
   })
 })
