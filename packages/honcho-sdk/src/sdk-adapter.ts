@@ -134,16 +134,27 @@ export class HonchoSdkRemote implements HonchoRemote {
 
   async search(scope: HonchoScope, query: string, maxItems: number): Promise<readonly HonchoRecallItem[]> {
     const messages = await this.client.search(query, {
-      filters: { peer_id: scope.userPeerId, metadata: { project_id: scope.projectId } },
+      filters: { metadata: { project_id: scope.projectId, human_peer_id: scope.userPeerId } },
       limit: maxItems,
     })
-    return messages.map((message) => ({
-      kind: 'message' as const,
-      text: message.content,
-      sourceId: message.id,
-      sessionId: message.sessionId,
-      createdAt: message.createdAt,
-    }))
+    const superseded = new Set(
+      messages
+        .filter((message) => message.metadata.role === 'correction')
+        .map((message) => message.metadata.supersedes)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+    )
+    return messages
+      .filter(
+        (message) =>
+          message.metadata.role === 'correction' || (!superseded.has(message.id) && !superseded.has(message.content)),
+      )
+      .map((message) => ({
+        kind: 'message' as const,
+        text: message.content,
+        sourceId: message.id,
+        sessionId: message.sessionId,
+        createdAt: message.createdAt,
+      }))
   }
 }
 

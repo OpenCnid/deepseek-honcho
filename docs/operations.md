@@ -22,6 +22,65 @@ Before enabling capture, document consent, included data classes, destination, r
 
 Corrections are append-only: `memory_correct` writes new content with optional `supersedes` metadata. It does not delete old remote or local data. Legal or policy deletion remains an operator action.
 
+### Approved hosted synthetic-evaluation policy
+
+The repository operator approved this policy on 2026-08-21 for the isolated evaluation only:
+
+- consent and data classes: deterministic synthetic prompts, responses, peer IDs, project IDs, session IDs, and content-free measurements only; no personal conversations, production identities, attachments, tool payloads, credentials, source secrets, or hidden reasoning;
+- destination: hosted Honcho at `https://api.honcho.dev` in an evaluation-only workspace;
+- retention: retain the local content-free report, but initiate deletion of primary remote evaluation resources within 24 hours after the run is accepted or abandoned;
+- export: no conversation-content export; the repository may retain aggregate classifications, latency, bounded token/character counts, timeout/error categories, request counts, and cost when the API exposes it;
+- ownership: the operator running the live evaluation owns deletion and must record content-free submission and verification timestamps;
+- backup deletion: the operator accepts Honcho's stated API-log and rolling encrypted-backup retention of up to 90 days for this synthetic-only data;
+- incident handling: stop live runs, revoke or rotate the key, preserve only content-free diagnostics, and use Honcho's support/privacy process when provider-side action is needed; and
+- lifecycle: create unique `synthetic_*` peers, projects, and sessions in a dedicated workspace; never reuse personal or production resources.
+
+This approval does not authorize personal-memory use or unfenced destructive cleanup. Cleanup must remain outside model tools and require an explicit operator invocation scoped to the exact evaluation workspace.
+
+### Persistent Windows host variable
+
+For a Windows-native DSH or Codex host, store `HONCHO_API_KEY` as a per-user environment variable by entering it through a masked PowerShell prompt. Do not place it in `config.toml`, `.env.example`, repository files, shell command arguments, or chat. A per-user environment variable survives reboot but is not a credential vault: processes running as the same Windows user can generally read it.
+
+Run this once in a PowerShell terminal owned by the operator:
+
+```powershell
+$honchoSecret = Read-Host 'Honcho API key' -AsSecureString
+$honchoSecretPointer = [IntPtr]::Zero
+try {
+  $honchoSecretPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($honchoSecret)
+  $honchoKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($honchoSecretPointer)
+  if ([string]::IsNullOrWhiteSpace($honchoKey)) { throw 'The Honcho API key cannot be empty.' }
+  [Environment]::SetEnvironmentVariable('HONCHO_API_KEY', $honchoKey, 'User')
+  [Environment]::SetEnvironmentVariable('HONCHO_BASE_URL', 'https://api.honcho.dev', 'User')
+  $env:HONCHO_API_KEY = $honchoKey
+  $env:HONCHO_BASE_URL = 'https://api.honcho.dev'
+} finally {
+  if ($honchoSecretPointer -ne [IntPtr]::Zero) {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($honchoSecretPointer)
+  }
+  Remove-Variable honchoKey, honchoSecret -ErrorAction SilentlyContinue
+}
+```
+
+Verify presence without printing the key:
+
+```powershell
+if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('HONCHO_API_KEY', 'User'))) {
+  'HONCHO_API_KEY is missing'
+} else {
+  'HONCHO_API_KEY is configured'
+}
+```
+
+To remove the persistent credential and the current shell copy:
+
+```powershell
+[Environment]::SetEnvironmentVariable('HONCHO_API_KEY', $null, 'User')
+Remove-Item Env:HONCHO_API_KEY -ErrorAction SilentlyContinue
+```
+
+After setting or removing the variable, fully restart the host application so new agent and terminal processes inherit the updated environment. Keep `HONCHO_LIVE_TEST` session-scoped so an ordinary test run cannot contact Honcho accidentally.
+
 ## Live tests
 
 The default test suite needs no key. To run an opt-in hosted or self-hosted smoke test, create an isolated non-production workspace and set:
@@ -34,6 +93,42 @@ HONCHO_BASE_URL=https://api.honcho.dev
 ```
 
 Then run `pnpm test:e2e`. The fixture creates unique `synthetic_*` peers, project, and session IDs. It does not delete remote resources. Inspect them, record evidence without message content, and perform cleanup using the approved operator process. Never reuse a personal or production peer ID.
+
+### Full live corpus
+
+The promotion comparison uses freshly provisioned evaluation workspaces rather than `HONCHO_LIVE_WORKSPACE_ID`. The runner writes `evaluation-results/live-resource-manifest.json` before the first remote creation so an interrupted run remains cleanable. The manifest contains resource IDs and timestamps, never the key or conversation content.
+
+Enable the two run-scoped creation flags only for the deliberate command:
+
+```powershell
+$env:HONCHO_LIVE_TEST = '1'
+$env:HONCHO_LIVE_PROVISION = '1'
+corepack pnpm@11.7.0 evaluate:live
+Remove-Item Env:HONCHO_LIVE_TEST, Env:HONCHO_LIVE_PROVISION -ErrorAction SilentlyContinue
+```
+
+The runner creates two `dsh_synthetic_eval_*` workspaces for explicit cross-workspace isolation, uses only `synthetic_*` peers/projects/sessions, bounds processing waits, and writes `evaluation-results/live-latest.json` without prompts, responses, queries, recalled text, keys, or remote error messages. `@honcho-ai/sdk@2.3.0` does not expose per-request billing, so the report records cost as unavailable instead of estimating it.
+
+If asynchronous processing remains pending or individual reads time out, reuse the manifest without recording new messages or creating resources:
+
+```powershell
+$env:HONCHO_LIVE_TEST = '1'
+$env:HONCHO_LIVE_RESUME = '1'
+corepack pnpm@11.7.0 resume:live
+Remove-Item Env:HONCHO_LIVE_TEST, Env:HONCHO_LIVE_RESUME -ErrorAction SilentlyContinue
+```
+
+Each resume writes a separate content-free attempt and refreshes a multi-attempt aggregate. The aggregate reports pass and timeout rates rather than hiding transient failures behind a selected attempt.
+
+After inspecting the content-free result, invoke destructive cleanup separately:
+
+```powershell
+$env:HONCHO_LIVE_CLEANUP = '1'
+corepack pnpm@11.7.0 cleanup:live
+Remove-Item Env:HONCHO_LIVE_CLEANUP -ErrorAction SilentlyContinue
+```
+
+Cleanup refuses non-owned or non-prefixed workspaces, verifies the run/corpus metadata before deletion, submits session deletion for every workspace before concurrent workspace deletion, waits boundedly for asynchronous absence, and records content-free submission/verification timestamps. It never exposes an administration operation as a model tool. Only the aggregate report may claim promotion, and only after verified cleanup plus all isolation, protected-case, token, normal-completion, fail-open, and baseline-improvement checks pass.
 
 ## Failure and shutdown behavior
 

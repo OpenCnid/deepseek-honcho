@@ -113,12 +113,37 @@ async function fakeApi(): Promise<{ baseURL: string; calls: Call[] }> {
     if (path.endsWith('/search'))
       return json(response, [
         {
-          id: 'search-1',
-          content: 'synthetic result',
+          id: 'old-source',
+          content: 'obsolete synthetic result',
           peer_id: 'human',
           session_id: honchoSessionId('root'),
           workspace_id: 'ws',
-          metadata: { project_id: 'project' },
+          metadata: { project_id: 'project', human_peer_id: 'human', role: 'user' },
+          created_at: createdAt,
+          token_count: 1,
+        },
+        {
+          id: 'correction-source',
+          content: 'corrected synthetic result',
+          peer_id: 'human',
+          session_id: honchoSessionId('root'),
+          workspace_id: 'ws',
+          metadata: {
+            project_id: 'project',
+            human_peer_id: 'human',
+            role: 'correction',
+            supersedes: 'old-source',
+          },
+          created_at: createdAt,
+          token_count: 1,
+        },
+        {
+          id: 'assistant-source',
+          content: 'assistant-authored project decision',
+          peer_id: 'assistant',
+          session_id: honchoSessionId('root'),
+          workspace_id: 'ws',
+          metadata: { project_id: 'project', human_peer_id: 'human', role: 'assistant' },
           created_at: createdAt,
           token_count: 1,
         },
@@ -168,7 +193,11 @@ describe('@honcho-ai/sdk@2.3.0 exact adapter calls', () => {
       },
     ])
     expect(await remote.representation(scope, 'preference', 5)).toBe('synthetic representation')
-    expect(await remote.search(scope, 'decision', 5)).toHaveLength(1)
+    const search = await remote.search(scope, 'decision', 5)
+    expect(search.map((item) => item.text)).toEqual([
+      'corrected synthetic result',
+      'assistant-authored project decision',
+    ])
 
     expect(api.calls.every((call) => call.authorization === 'Bearer synthetic-sdk-key')).toBe(true)
     expect(api.calls).toContainEqual(
@@ -180,7 +209,11 @@ describe('@honcho-ai/sdk@2.3.0 exact adapter calls', () => {
     expect(api.calls).toContainEqual(
       expect.objectContaining({
         path: '/v3/workspaces/ws/search',
-        body: { query: 'decision', filters: { peer_id: 'human', metadata: { project_id: 'project' } }, limit: 5 },
+        body: {
+          query: 'decision',
+          filters: { metadata: { project_id: 'project', human_peer_id: 'human' } },
+          limit: 5,
+        },
       }),
     )
     const sessionCreate = api.calls.find((call) => call.path === '/v3/workspaces/ws/sessions')

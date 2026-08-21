@@ -56,6 +56,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 3.18.1
         version: 3.18.1
+      '@honcho-ai/sdk':
+        specifier: 2.3.0
+        version: 2.3.0
       '@types/node':
         specifier: 22.20.0
         version: 22.20.0
