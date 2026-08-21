@@ -1,0 +1,17 @@
+# Point this at an operator-managed Honcho MCP Worker. Do not point the MCP client directly at the Honcho REST API.
+- id: mcp-honcho
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: honcho
+    transport: streamable-http
+    url: !!js process.env.HONCHO_MCP_URL
+    headers:
+      Authorization: !!js '`Bearer ${process.env.HONCHO_API_KEY}`'
+      X-Honcho-Workspace-ID: !!js process.env.HONCHO_WORKSPACE_ID
+    toolCallTimeoutMs: 1500
+    failOnStartupError: false
+    reconnect:
+      enabled: true
+      initialDelayMs: 500
+      maxDelayMs: 30000
+      maxAttempts: 5

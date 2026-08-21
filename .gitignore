@@ -1,4 +1,5 @@
 node_modules/
+lib/
 dist/
 coverage/
 artifacts/
@@ -10,3 +11,6 @@ artifacts/
 Thumbs.db
 .deepseek-honcho/
 test-results/
+evaluation-results/*.json
+!evaluation-results/.gitkeep
+*.tgz

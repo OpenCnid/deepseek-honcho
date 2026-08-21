@@ -1,0 +1,23 @@
+# The surrounding profile must mount DSH agents and ToolRuntime.
+- id: deepseek-honcho
+  name: '@deepseek-honcho/dsh-honcho-bundle'
+  config:
+    provider:
+      apiKeyEnv: HONCHO_API_KEY
+      baseURL: https://api.honcho.dev
+      workspaceId: synthetic_workspace
+      userPeerId: synthetic_human
+      assistantPeerId: synthetic_assistant
+      projectId: synthetic_project
+      stateRoot: C:/replace/with/absolute/private/deepseek-honcho-state
+      workspaceAutoCreate: false
+      peerAutoCreate: true
+      sessionAutoCreate: true
+      assistantObservation: false
+    agentMemory:
+      capture: completed-root-turns
+      recall: first-root-step
+      recallTimeoutMs: 1500
+      recallMaxItems: 5
+      recallMaxTokens: 1200
+    tools: {}
