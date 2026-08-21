@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-08-21",
+  "upstreams": [
+    {
+      "name": "DeepSeek Harness",
+      "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+      "revision": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
+      "tag": "dsh-v0.1.0-rc.7",
+      "license": "MIT",
+      "use": "Public plugin, session-event, pre-step, tool, MCP client, and service contracts; dependency only",
+      "copiedSource": false
+    },
+    {
+      "name": "Honcho",
+      "repository": "https://github.com/plastic-labs/honcho.git",
+      "revision": "ddbb90e36f2d148c7982f6ed85b09d31cabf5944",
+      "observedMcpVersion": "3.0.0",
+      "license": "AGPL-3.0",
+      "use": "Contract research for separately operated MCP/server; no server or MCP source copied",
+      "copiedSource": false
+    },
+    {
+      "name": "@honcho-ai/sdk",
+      "repository": "https://github.com/plastic-labs/honcho.git",
+      "revision": "ddbb90e36f2d148c7982f6ed85b09d31cabf5944",
+      "version": "2.3.0",
+      "license": "Apache-2.0",
+      "registryIntegrity": "sha512-98TKsWvXpuR/Qcew+uIFH/ISBtnzWnTAjsJVkAuiH8gs5yOd/MNefj6Z9V4IG3vjkADyJunAmsi85UsgIchQ7w==",
+      "use": "Exact release dependency in the SDK provider",
+      "copiedSource": false
+    },
+    {
+      "name": "DeepSeek RLM",
+      "repository": "https://github.com/OpenCnid/deepseek-rlm.git",
+      "revision": "79b6b28e16c7305e8e791f2d8c9d2935e75ade60",
+      "version": "0.1.0-preview.0",
+      "license": "MIT",
+      "use": "Contract research for the dsh_tools.call bridge; no runtime dependency or copied source",
+      "copiedSource": false
+    }
+  ],
+  "reviewedContracts": [
+    "docs/architecture.md",
+    "packages/mcp/mcp-client/README.md",
+    "packages/context/tmux-context/README.md",
+    "packages/core/agent/src/runtime-types.ts",
+    "packages/core/session/src/types.ts",
+    "packages/core/tools/src/schema.ts",
+    "mcp/README.md",
+    "skills/honcho-memory/SKILL.md",
+    "sdks/typescript/package.json",
+    "sdks/typescript/src/client.ts",
+    "sdks/typescript/src/session.ts",
+    "sdks/typescript/src/peer.ts",
+    "deepseek-rlm/packages/rlm-jupyter/src/host.ts",
+    "deepseek-rlm/packages/tool-ipython/src/index.ts"
+  ]
+}

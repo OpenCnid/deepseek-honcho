@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/honcho" },
+    { "path": "packages/honcho-sdk" },
+    { "path": "packages/agent-memory" },
+    { "path": "packages/tool-memory" },
+    { "path": "packages/bundle" }
+  ]
+}

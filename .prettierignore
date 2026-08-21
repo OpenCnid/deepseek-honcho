@@ -1,0 +1,11 @@
+lib
+node_modules
+coverage
+artifacts
+pnpm-lock.yaml
+LICENSE
+AGENTS.md
+GAMEPLAN.md
+IMPLEMENTATION_PROMPT.md
+README.md
+SPEC.md

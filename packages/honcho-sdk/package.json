@@ -1,0 +1,35 @@
+{
+  "name": "@deepseek-honcho/dsh-honcho-sdk",
+  "version": "0.1.0",
+  "description": "Honcho TypeScript SDK provider and durable outbox for DeepSeek Harness",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@deepseek-honcho/dsh-honcho": "workspace:^",
+    "@honcho-ai/sdk": "2.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-agent": "0.1.0-rc.7",
+    "@deepseek-ai/schemastery": "3.18.1"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  }
+}

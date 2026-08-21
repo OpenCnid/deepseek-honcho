@@ -1,0 +1,18 @@
+# Stage A experiment only. The DSH MCP client registers mcp__honcho__* tools.
+# Keep the real key in the DSH host environment; never place it in this file.
+- id: mcp-honcho
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: honcho
+    transport: streamable-http
+    url: https://mcp.honcho.dev
+    headers:
+      Authorization: !!js '`Bearer ${process.env.HONCHO_API_KEY}`'
+      X-Honcho-Workspace-ID: !!js process.env.HONCHO_WORKSPACE_ID
+    toolCallTimeoutMs: 1500
+    failOnStartupError: false
+    reconnect:
+      enabled: true
+      initialDelayMs: 500
+      maxDelayMs: 30000
+      maxAttempts: 5

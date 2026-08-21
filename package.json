@@ -1,0 +1,52 @@
+{
+  "name": "deepseek-honcho-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:unit": "vitest run packages tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "evaluate": "tsx scripts/evaluate.ts",
+    "check:provenance": "tsx scripts/check-provenance.ts",
+    "check:secrets": "tsx scripts/check-secrets.ts",
+    "check:packages": "tsx scripts/check-packages.ts",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm evaluate && pnpm check:provenance && pnpm check:secrets && pnpm check:packages"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-agent": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-agent-loop": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-agent-loop-testkit": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-brand": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-invariants": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-mcp-client": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-scope": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-session": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-session-persistence": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-timeout": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.0-rc.7",
+    "@deepseek-ai/schemastery": "3.18.1",
+    "@types/node": "22.20.0",
+    "oxlint": "1.46.0",
+    "prettier": "3.6.2",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  }
+}

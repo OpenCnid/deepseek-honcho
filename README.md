@@ -1,56 +1,82 @@
 # DeepSeek Honcho
 
-DeepSeek Honcho is the experimental cross-session memory layer for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It integrates [Honcho](https://github.com/plastic-labs/honcho) without turning Honcho into a second harness and without treating generated memory as repository truth.
+DeepSeek Honcho is a working, experimental cross-session memory integration for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). DSH remains the only agent runtime and control plane. Honcho is a fallible memory service; Git, current files, tests, CI, explicit corrections, DSH policy, and committed session events remain authoritative.
 
-Status: architecture and implementation specification. No production plugin has been implemented yet.
+The repository implements two composable paths:
 
-## The decision
+- Stage A uses DSH's existing MCP client and the DSH-adapted `honcho-memory` skill for evaluation.
+- The native path provides a Cordis Service Definition, the official TypeScript SDK provider, lifecycle capture/recall Consumer, five-tool Consumer, and an optional bundle.
 
-We will use two integration stages:
+This is not presented as production-ready. The deterministic synthetic evaluation passes, but the promotion gate remains blocked until an isolated live comparison and operator-approved retention/deletion procedures are recorded.
 
-1. **MCP experiment:** connect DSH's existing MCP client to hosted or self-hosted Honcho and add a DSH-adapted memory skill. This is the fastest way to validate recall quality, identity mapping, isolation, correction, latency, and cost.
-2. **Native Cordis plugin:** build an SDK-backed DSH capability that records completed root-agent exchanges automatically, injects bounded recall at the first step of a turn, and exposes a small safe tool surface. This is the target production architecture if the experiment passes its gates.
+## Packages
 
-An MCP server plus a skill is sufficient to test Honcho. It is not sufficient for dependable always-on memory: a skill cannot guarantee that every completed exchange is recorded, and exposing Honcho's complete MCP schema adds token cost and destructive administration tools the model does not normally need.
+| Package | Responsibility |
+| --- | --- |
+| `@deepseek-honcho/dsh-honcho` | Provider-neutral `ctx.honcho` service, types, identity, sanitizer, and fake provider |
+| `@deepseek-honcho/dsh-honcho-sdk` | Host-only `@honcho-ai/sdk@2.3.0` provider, atomic-file outbox, worker, retry/circuit/deduplication |
+| `@deepseek-honcho/dsh-agent-memory` | Completed-root-turn capture and first-root-step untrusted recall |
+| `@deepseek-honcho/dsh-tool-memory` | Exactly five host-scoped model tools |
+| `@deepseek-honcho/dsh-honcho-bundle` | Optional composition of the preceding provider and Consumers |
 
-## Where it fits
+The Service Definition, provider, lifecycle Consumer, tool Consumer, and bundle can be mounted separately. The bundle does not mount an agent loop, LLM adapter, policy service, ToolRuntime, or credential manager.
+
+## Verified behavior
+
+- Automatic capture and automatic recall are both off by default.
+- When capture is enabled, only a completed root-agent exchange with direct user text and final assistant text is admitted. System/developer prompts, plugin-injected context, tool arguments/results, hidden reasoning, partial streams, attachments, errored turns, and child/subagent chatter are excluded.
+- Text is normalized, regex-redacted, character/byte bounded, and deterministically identified before a versioned local outbox write. A user-visible turn never waits for remote Honcho delivery.
+- Delivery uses one atomic JSON document per delivery, deterministic IDs/fingerprints, per-session ordering, cross-session concurrency, exponential backoff with jitter, an auth/transient circuit breaker, metadata-filter duplicate defense, partial-delivery handling, dead letters, bounded shutdown drain, and an HMR/process generation fence.
+- Recall runs only on step 1 of a root turn by default, is time/item/token/query bounded, and is persisted with `{ kind: "plugin", plugin: "deepseek-honcho", form: "recall" }` provenance. Recalled text is wrapped as untrusted data and is never recaptured.
+- The default model surface is only `memory_recall`, `memory_search`, `memory_record`, `memory_correct`, and `memory_status`. Identity is host-controlled; no tool accepts workspace, project, or human peer selection. No destructive Honcho administration tool is exposed.
+- Timeout, outage, post-start auth failure, or processing lag fails open for recall and leaves writes in the local outbox.
+
+## Quick start
+
+Use Node `^22.19 || >=24` and pnpm `11.7.0`:
+
+```sh
+corepack pnpm@11.7.0 install --frozen-lockfile
+corepack pnpm@11.7.0 verify
+corepack pnpm@11.7.0 evaluate
+```
+
+Start with synthetic identities. Keep the real key only in the DSH host environment. See [`examples/native`](./examples/native/README.md) for native composition and [`examples/mcp`](./examples/mcp/README.md) for the Stage A experiment.
+
+## Evaluation and live tests
+
+`pnpm evaluate` executes the 11 deterministic cases in `tests/fixtures/evaluation-corpus.json` and writes only IDs, booleans, bounds, and aggregate metrics to `evaluation-results/latest.json`. It never writes conversation content. The corpus covers preferences, project and peer isolation, corrections, freshness against current evidence, sparse evidence, stored prompt injection, subagent exclusion, outage/fail-open, and long-history bounds.
+
+`pnpm test:e2e` is skipped without `HONCHO_LIVE_TEST=1`. A live run also requires `HONCHO_API_KEY` and `HONCHO_LIVE_WORKSPACE_ID`; it creates unique synthetic peers/projects/sessions and never uses personal memory. It performs no destructive cleanup. Follow the operator procedure in [`docs/operations.md`](./docs/operations.md).
+
+## Trust and runtime boundaries
 
 ```mermaid
 flowchart LR
     user["Engineer"] --> dsh["DSH control plane"]
-    dsh --> rlm["DeepSeek RLM: session-scoped computation"]
-    dsh <--> honcho["Honcho: cross-session derived memory"]
-    dsh --> git["Git, code, tests, CI: current truth"]
+    dsh --> rlm["RLM session computation"]
+    dsh <--> honcho["Honcho fallible memory"]
+    dsh --> truth["Git, files, tests, CI"]
 ```
 
-- DSH owns the agent loop, policy, model credentials, tools, session log, compaction, and lifecycle.
-- DeepSeek RLM supplies persistent computation inside one agent session. It must re-read current code and artifacts.
-- Honcho learns preferences, recurring intent, prior decisions, and useful cross-session history.
-- Git, files, tests, and CI remain authoritative for the present state of the software.
+Credentials are read from a host-selected environment-variable name by the SDK provider. They are not included in tool schemas/results, model context, DSH events, logs, fixtures, or the RLM bridge. RLM may call memory only through its `dsh_tools.call(...)` host bridge, which routes into `ctx.tools.execute` and therefore DSH policy and telemetry. The IPython kernel itself is not a sandbox; direct Python, filesystem, network, and subprocess activity has kernel-process OS authority. Use an external OS/container sandbox for untrusted code.
 
-## Documents
+Hosted mode sends eligible bounded text to the configured Honcho service. Self-hosted mode changes the destination, not the egress fact. The local outbox and dead letters contain redacted but still sensitive conversation text. See [`SECURITY.md`](./SECURITY.md) and [`docs/operations.md`](./docs/operations.md).
 
-- [`GAMEPLAN.md`](./GAMEPLAN.md) — phased rollout, decision gates, risks, and evaluation plan.
-- [`SPEC.md`](./SPEC.md) — normative implementation contract for the MCP experiment and native plugin.
-- [`IMPLEMENTATION_PROMPT.md`](./IMPLEMENTATION_PROMPT.md) — standalone prompt for a separate Codex implementation task.
-- [`AGENTS.md`](./AGENTS.md) — repository rules for coding agents.
+## Provenance and licenses
 
-## Research baselines
+- DeepSeek Harness revision `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca` (`dsh-v0.1.0-rc.7`), MIT; exact `0.1.0-rc.7` packages.
+- Honcho revision `ddbb90e36f2d148c7982f6ed85b09d31cabf5944`; server/MCP AGPL-3.0, inspected as an external service contract only.
+- `@honcho-ai/sdk` exactly `2.3.0`, Apache-2.0, used as a dependency.
+- DeepSeek RLM revision `79b6b28e16c7305e8e791f2d8c9d2935e75ade60`, MIT, inspected for the host-bridge and empty-by-default kernel environment contracts; not a dependency.
+- This repository and its five packages are Apache-2.0.
 
-The initial plan is grounded in these exact revisions:
+No Honcho server/MCP source was copied. No DSH patch was required: the pinned public `session/event`, `agent/pre-step`, Service, MCP, and ToolRuntime seams were sufficient. Machine-readable details are in [`provenance/upstreams.json`](./provenance/upstreams.json) and [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
 
-| Upstream | Revision | Observed version |
-| --- | --- | --- |
-| DeepSeek Harness | [`99f6f02fecdb7dff40c3fbc9470f5907c29f74ca`](https://github.com/deepseek-ai/deepseek-harness/tree/99f6f02fecdb7dff40c3fbc9470f5907c29f74ca) | `dsh-v0.1.0-rc.7` |
-| Honcho | [`ddbb90e36f2d148c7982f6ed85b09d31cabf5944`](https://github.com/plastic-labs/honcho/tree/ddbb90e36f2d148c7982f6ed85b09d31cabf5944) | MCP `3.0.0`; TypeScript SDK `2.3.0` |
+## Project documents
 
-Upgrades must be intentional and accompanied by contract and integration-test review.
-
-## Important boundaries
-
-- Honcho recall is untrusted, potentially stale context—not instructions and not proof.
-- Root human/assistant exchanges are eligible for automatic capture. RLM/subagent chatter, tool outputs, system prompts, and injected memory are excluded by default.
-- Honcho credentials stay in the DSH host process. They must not be copied into an RLM IPython kernel or model-visible configuration.
-- Remote capture and recall are explicit opt-ins.
-- Honcho's server repository is AGPL-3.0; its TypeScript SDK is Apache-2.0. Keep SDK use as a dependency and perform a licensing review before copying or modifying server/MCP source.
-- This planning repository intentionally has no project license yet. Choose one before distributing implementation artifacts.
+- [`SPEC.md`](./SPEC.md) is normative.
+- [`GAMEPLAN.md`](./GAMEPLAN.md) records the rollout rationale.
+- [`docs/operations.md`](./docs/operations.md) covers deployment, outbox, retention, and live tests.
+- [`docs/verification.md`](./docs/verification.md) maps milestone and Definition-of-Done evidence and remaining external gates.
+- [`SECURITY.md`](./SECURITY.md) defines the security/privacy boundary.

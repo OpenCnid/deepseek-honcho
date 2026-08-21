@@ -1,0 +1,16 @@
+# DeepSeek RLM 0.1.0-preview.0 contract example. The surrounding RLM bundle owns these rows.
+# Empty environment inheritance is the credential boundary: never add HONCHO_API_KEY.
+- insert:
+    - id: rlm-jupyter
+      name: '@deepseek-rlm/dsh-rlm-jupyter'
+      config:
+        artifactRoot: D:/replace/with/private/rlm-artifacts
+        managedRuntimeRoot: D:/replace/with/private/rlm-runtime
+        subagentProvider: rlm-spawn
+        envAllowlist: []
+        env: {}
+        adapters:
+          tools: true
+
+    - id: rlm-ipython-tool
+      name: '@deepseek-rlm/dsh-tool-ipython'

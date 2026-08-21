@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OpenCnid/deepseek-honcho/evaluation.schema.json",
+  "title": "DeepSeek Honcho deterministic evaluation corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "corpusId", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "corpusId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "cases": {
+      "type": "array",
+      "minItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "workspaceId", "userPeerId", "projectId", "setup", "query", "expect"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "category": {
+            "enum": [
+              "preference",
+              "project-isolation",
+              "peer-isolation",
+              "correction",
+              "freshness",
+              "sparse-evidence",
+              "prompt-injection",
+              "subagent-exclusion",
+              "outage",
+              "bounds"
+            ]
+          },
+          "workspaceId": { "type": "string" },
+          "userPeerId": { "type": "string" },
+          "projectId": { "type": "string" },
+          "setup": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["projectId", "peerId", "agentKind", "role", "text"],
+              "properties": {
+                "projectId": { "type": "string" },
+                "peerId": { "type": "string" },
+                "agentKind": { "enum": ["root", "child"] },
+                "role": { "enum": ["user", "assistant", "correction"] },
+                "text": { "type": "string" },
+                "supersedes": { "type": "string" }
+              }
+            }
+          },
+          "query": { "type": "string" },
+          "currentEvidence": { "type": "string" },
+          "fault": { "enum": ["none", "timeout", "unavailable"] },
+          "expect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["outcome", "mustContain", "mustNotContain", "normalCompletion", "maxTokens", "maxLatencyMs"],
+            "properties": {
+              "outcome": { "enum": ["hit", "miss", "subordinate", "fail-open", "bounded"] },
+              "mustContain": { "type": "array", "items": { "type": "string" } },
+              "mustNotContain": { "type": "array", "items": { "type": "string" } },
+              "normalCompletion": { "type": "boolean" },
+              "maxTokens": { "type": "integer", "minimum": 0 },
+              "maxLatencyMs": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

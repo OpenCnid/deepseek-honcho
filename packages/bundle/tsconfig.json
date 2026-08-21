@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "lib", "tsBuildInfoFile": "lib/.tsbuildinfo" },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../honcho" },
+    { "path": "../honcho-sdk" },
+    { "path": "../agent-memory" },
+    { "path": "../tool-memory" }
+  ]
+}
