@@ -16,6 +16,20 @@ Both pending and dead-letter files contain regex-redacted but potentially sensit
 
 Before deleting outbox data, stop the DSH host and verify the exact absolute `stateRoot`. Back up or export required deliveries, then use an operator-owned deletion process. This project intentionally exposes no deletion tool or automatic live cleanup.
 
+## Artifact-root operations
+
+Artifact memory requires two separate absolute roots: `artifactMemory.artifactRoot` for durable project-local objects/cards and `artifactMemory.rlmArtifactRoot` matching the RLM provider's `artifactRoot`. Neither may be a filesystem root, home directory, repository root, DSH profile root, Honcho `stateRoot`, or nested within the other. Startup rejects known overlap, symlinks, junctions/reparse points, and unsafe existing components.
+
+The durable layout is `artifactRoot/projects/<one-way-project-key>/objects/<prefix>/art_*` plus `cards/exp_*.json`, a temporary directory, and content-free lock files. Raw project IDs and source paths are not persisted in object filenames. Cards do contain the configured project ID and bounded experiment metadata, so both objects and cards remain sensitive. On POSIX, directories/files are created with owner-only intent; Windows operators must enforce equivalent ACLs on the containing volume.
+
+Only files under `rlmArtifactRoot/sessions/<DSH-derived-session-id>/exports/` are ingestible. Do not point `rlmArtifactRoot` at a copied or model-selected tree. Session snapshots, manifests, connection files, harness state, directories, multiple-hard-link files, symlinks, junctions, and detectable reparse/link escapes are rejected. The RLM root remains RLM-owned; the artifact package never cleans it.
+
+Back up objects and cards as one project unit. Restoring cards without their objects causes resolution to fail closed; restoring objects without cards leaves operator-inspectable orphans that are not searchable. There is no automatic garbage collection. Before any operator deletion, stop the host, resolve the exact project-key directory, export required cards/objects, account for outbox projections and remote Honcho retention separately, and use a recoverable operator process. No inspection, export, retention, deletion, purge, or orphan-cleanup operation is model-callable.
+
+Pending or failed cards reconcile through the ordinary Honcho outbox on startup and at the configured bounded interval. `pending` means local bytes/card are committed but outbox admission failed; `queued` means the sanitized projection is durably in the local outbox, not necessarily semantically searchable. An outage never makes Honcho the source of artifact bytes. Missing or corrupt local bytes are not redownloaded and resolution fails closed.
+
+For incident response, stop new records, preserve the project directory and Honcho outbox, record content-free counts/error codes, and verify size/SHA-256 through an operator-controlled process. Do not paste paths, cards, bytes, raw queries, project IDs, or credentials into routine logs or reports. Stale source-version results remain historical artifacts and must not be represented as current truth.
+
 ## Retention, export, and deletion
 
 Before enabling capture, document consent, included data classes, destination, retention period, export owner, deletion owner/SLA, backup deletion, incident handling, and peer/workspace lifecycle. Use Honcho's operator/admin interface outside model context for remote export or deletion. Never grant those operations through the default memory tools.

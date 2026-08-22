@@ -4,12 +4,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import HonchoMemory, {
   type HonchoIdentityConfig,
+  type HonchoAgentKind,
   type HonchoRecallItem,
   type HonchoRecallRequest,
   type HonchoRecallResult,
   type HonchoRecordRequest,
   type HonchoScope,
   type HonchoStatus,
+  honchoSessionId,
   resolveHostScope,
   validateIdentity,
 } from './index.ts'
@@ -42,6 +44,15 @@ export class FakeHonchoMemory extends HonchoMemory {
 
   resolveScope(agent: Agent): HonchoScope | undefined {
     return resolveHostScope(agent, this.identity)
+  }
+
+  scopeForSession(dshSessionId: string, agentKind: HonchoAgentKind): HonchoScope {
+    return Object.freeze({
+      ...this.identity,
+      honchoSessionId: honchoSessionId(dshSessionId),
+      dshSessionId,
+      agentKind,
+    })
   }
 
   async ensureScope(scope: HonchoScope, signal?: AbortSignal): Promise<void> {

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OpenCnid/deepseek-honcho/artifact-evaluation.schema.json",
+  "title": "DeepSeek Honcho artifact-memory deterministic evaluation corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "corpusId", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "corpusId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "cases": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "expect"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "category": {
+            "enum": [
+              "oversized",
+              "exact-search",
+              "semantic-search",
+              "concurrency",
+              "outage",
+              "freshness",
+              "integrity",
+              "isolation",
+              "prompt-injection",
+              "quota-recovery",
+              "disabled-baseline"
+            ]
+          },
+          "expect": { "type": "string" }
+        }
+      }
+    }
+  }
+}

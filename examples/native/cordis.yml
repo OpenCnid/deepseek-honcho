@@ -20,4 +20,22 @@
       recallTimeoutMs: 1500
       recallMaxItems: 5
       recallMaxTokens: 1200
+    artifactMemory:
+      enabled: true
+      artifactRoot: D:/replace/with/absolute/private/deepseek-artifact-memory
+      # Must exactly match the RLM Jupyter provider's artifactRoot below.
+      rlmArtifactRoot: D:/replace/with/private/rlm-artifacts
+      recordTool: true
+      resolveTool: true
+      remoteIndexing: true
+      integrityMode: always
+      maxArtifactBytes: 1073741824
+      maxProjectBytes: 21474836480
+      maxCardsPerProject: 10000
+      localSearchMaxResults: 20
+      localSearchTimeoutMs: 100
+      reconciliationIntervalMs: 30000
+      reconciliationBatchSize: 50
+      reconciliationConcurrency: 2
+      retentionPolicy: operator-only
     tools: {}

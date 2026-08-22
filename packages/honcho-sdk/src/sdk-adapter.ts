@@ -11,8 +11,13 @@ import {
   UnprocessableEntityError,
   type MessageInput,
 } from '@honcho-ai/sdk'
-import type { HonchoRecallItem, HonchoRecordMessage, HonchoScope } from '@deepseek-honcho/dsh-honcho'
-import { HonchoMemoryError } from '@deepseek-honcho/dsh-honcho'
+import type {
+  HonchoExperimentCardItem,
+  HonchoRecallItem,
+  HonchoRecordMessage,
+  HonchoScope,
+} from '@deepseek-honcho/dsh-honcho'
+import { HONCHO_PLUGIN_VERSION, HonchoMemoryError } from '@deepseek-honcho/dsh-honcho'
 
 export interface RemoteMessage {
   readonly id: string
@@ -54,7 +59,7 @@ export class HonchoSdkRemote implements HonchoRemote {
       workspaceId: config.workspaceId,
       timeout: config.timeoutMs,
       maxRetries: config.maxRetries,
-      defaultHeaders: { 'User-Agent': 'deepseek-honcho/0.1.0' },
+      defaultHeaders: { 'User-Agent': `deepseek-honcho/${HONCHO_PLUGIN_VERSION}` },
     })
   }
 
@@ -91,7 +96,7 @@ export class HonchoSdkRemote implements HonchoRemote {
         dsh_session_id: scope.dshSessionId,
         dsh_agent_kind: scope.agentKind,
         project_id: scope.projectId,
-        plugin_version: '0.1.0',
+        plugin_version: HONCHO_PLUGIN_VERSION,
       },
       peers,
     })
@@ -154,8 +159,62 @@ export class HonchoSdkRemote implements HonchoRemote {
         sourceId: message.id,
         sessionId: message.sessionId,
         createdAt: message.createdAt,
+        ...(() => {
+          const experimentCard = parseExperimentCard(message.metadata)
+          return experimentCard === undefined ? {} : { experimentCard }
+        })(),
       }))
   }
+}
+
+function parseExperimentCard(metadata: Readonly<Record<string, unknown>>): HonchoExperimentCardItem | undefined {
+  if (
+    metadata.content_classification !== 'experiment-card' ||
+    metadata.remote_card_schema_version !== 1 ||
+    metadata.role !== 'experiment-card'
+  ) {
+    return undefined
+  }
+  const required = [
+    'experiment_id',
+    'artifact_id',
+    'project_id',
+    'query_fingerprint',
+    'source_version',
+    'source_label',
+    'title',
+    'summary',
+  ] as const
+  if (required.some((key) => typeof metadata[key] !== 'string' || (metadata[key] as string).length === 0)) {
+    return undefined
+  }
+  if (!Number.isSafeInteger(metadata.projection_revision) || (metadata.projection_revision as number) < 1) {
+    return undefined
+  }
+  const shape = typeof metadata.shape === 'string' ? metadata.shape : undefined
+  const columns = stringArray(metadata.columns)
+  const tags = stringArray(metadata.tags)
+  return Object.freeze({
+    schemaVersion: 1,
+    experimentId: metadata.experiment_id as string,
+    artifactId: metadata.artifact_id as string,
+    projectId: metadata.project_id as string,
+    queryFingerprint: metadata.query_fingerprint as string,
+    sourceVersion: metadata.source_version as string,
+    source: metadata.source_label as string,
+    title: metadata.title as string,
+    summary: metadata.summary as string,
+    ...(shape === undefined ? {} : { shape }),
+    ...(columns === undefined ? {} : { columns }),
+    ...(tags === undefined ? {} : { tags }),
+    projectionRevision: metadata.projection_revision as number,
+  })
+}
+
+function stringArray(value: unknown): readonly string[] | undefined {
+  return Array.isArray(value) && value.every((member) => typeof member === 'string')
+    ? Object.freeze([...value])
+    : undefined
 }
 
 export function classifySdkError(error: unknown): HonchoMemoryError {

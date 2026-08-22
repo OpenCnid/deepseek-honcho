@@ -5,11 +5,12 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const packageDirs = ['honcho', 'honcho-sdk', 'agent-memory', 'tool-memory', 'bundle']
+const packageDirs = ['honcho', 'honcho-sdk', 'agent-memory', 'artifact-memory', 'tool-memory', 'bundle']
 const expectedNames = new Set([
   '@deepseek-honcho/dsh-honcho',
   '@deepseek-honcho/dsh-honcho-sdk',
   '@deepseek-honcho/dsh-agent-memory',
+  '@deepseek-honcho/dsh-artifact-memory',
   '@deepseek-honcho/dsh-tool-memory',
   '@deepseek-honcho/dsh-honcho-bundle',
 ])
@@ -124,7 +125,7 @@ try {
       `'use strict'`,
       `const replacements = ${JSON.stringify(replacements)}`,
       `module.exports = { hooks: { readPackage(pkg) {`,
-      `  for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {`,
+      `  for (const field of ['dependencies', 'optionalDependencies']) {`,
       `    if (pkg[field] === undefined) continue`,
       `    for (const [name, value] of Object.entries(replacements)) {`,
       `      if (pkg[field][name] !== undefined) pkg[field][name] = value`,
@@ -142,8 +143,10 @@ try {
   const smoke = [
     "const bundle = await import('@deepseek-honcho/dsh-honcho-bundle')",
     "const seam = await import('@deepseek-honcho/dsh-honcho')",
+    "const artifacts = await import('@deepseek-honcho/dsh-artifact-memory')",
     "if (bundle.name !== 'deepseek-honcho' || bundle.Config === undefined) throw new Error('bundle import failed')",
     "if (typeof seam.honchoSessionId !== 'function') throw new Error('service import failed')",
+    "if (typeof artifacts.LocalArtifactStore !== 'function' || artifacts.Config === undefined) throw new Error('artifact import failed')",
     "console.log('isolated package imports passed')",
   ].join(';')
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', smoke], {
@@ -152,7 +155,7 @@ try {
   })
   if (result.status !== 0) throw new Error(`isolated import failed\n${result.stdout}\n${result.stderr}`)
   if (!result.stdout.includes('isolated package imports passed')) throw new Error('isolated import emitted no proof')
-  console.log('packages: five tarballs inspected and imported in an isolated install')
+  console.log('packages: six tarballs inspected and imported in an isolated install')
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true })
 }

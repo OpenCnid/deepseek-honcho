@@ -1,17 +1,20 @@
 # DeepSeek Honcho specification
 
-Status: Draft v0.1
+Status: Implemented v0.1 baseline; Draft v0.2 artifact-memory extension
 Date: 2026-08-21
 Target: DeepSeek Harness `dsh-v0.1.0-rc.7`
 
 ## 1. Summary
 
-Build and evaluate a cross-session memory integration between DeepSeek Harness (DSH) and Honcho.
+Build and evaluate a cross-session memory integration between DeepSeek Harness (DSH) and Honcho, then extend it with a small artifact-reference layer for exact, reusable experimental results produced inside DeepSeek RLM.
 
-The project has two deliverables:
+The project has three deliverables:
 
 1. an MCP-based experiment that validates the value and operating characteristics of Honcho using DSH's existing MCP client; and
-2. an installable native Cordis plugin that provides reliable lifecycle capture, bounded first-step recall, a durable outbox, and a deliberately small model-facing tool surface.
+2. an installable native Cordis plugin that provides reliable lifecycle capture, bounded first-step recall, a durable outbox, and a deliberately small model-facing tool surface; and
+3. an optional artifact-memory package that keeps exact result bytes in a project-scoped local object store while Honcho indexes sanitized experiment cards that point to those bytes.
+
+Deliverables 1 and 2 are the implemented v0.1 baseline in this repository. Deliverable 3 is the next implementation target. Sections 26 through 35 are the complete normative contract for that extension. Where an extension requirement is more specific than a baseline requirement, the extension requirement governs only artifact-backed memory.
 
 DSH MUST remain the sole agent runtime. Honcho MUST be treated as a fallible derived-memory service. Git, files, tests, CI, and DSH's own event log remain authoritative for current software state and control-plane history.
 
@@ -24,6 +27,8 @@ flowchart TB
     outbox["Durable local outbox"]
     api["Honcho SDK/API"]
     memory["Representations, messages, conclusions, search"]
+    cards["Sanitized experiment cards"]
+    artifacts["Project-scoped exact artifacts"]
     repo["Current repository and tests"]
     rlm["DeepSeek RLM kernel"]
 
@@ -31,6 +36,8 @@ flowchart TB
     loop --> events
     events --> plugin
     plugin --> outbox --> api --> memory
+    rlm --> artifacts
+    artifacts --> cards --> outbox
     memory --> plugin --> loop
     loop <--> repo
     loop <--> rlm
@@ -45,6 +52,8 @@ MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative.
 
 “Recall” means Honcho-derived text supplied to a model. Recall is not trusted instruction text, is not proof, and may be stale or wrong.
 
+“Artifact” means immutable exact bytes copied into the configured project-scoped artifact store. “Artifact reference” means an opaque, versioned identifier plus integrity metadata; it is not a filesystem path. “Experiment card” means the small structured record that connects semantic description and provenance to an artifact reference. “Local card” means the complete host-side record. “Remote card” means the bounded, sanitized subset sent to Honcho.
+
 ## 3. Pinned baselines and provenance
 
 Implementation MUST begin against these revisions:
@@ -54,6 +63,7 @@ Implementation MUST begin against these revisions:
 | DeepSeek Harness | `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca` | `dsh-v0.1.0-rc.7`; MIT |
 | Honcho | `ddbb90e36f2d148c7982f6ed85b09d31cabf5944` | MCP `3.0.0`; server repository AGPL-3.0 |
 | Honcho TypeScript SDK | source at the Honcho revision above | `@honcho-ai/sdk` `2.3.0`; Apache-2.0 |
+| DeepSeek RLM | `79b6b28e16c7305e8e791f2d8c9d2935e75ade60` | `0.1.0-preview.0`; MIT |
 
 Normative upstream references:
 
@@ -63,6 +73,7 @@ Normative upstream references:
 - [Honcho MCP server](https://github.com/plastic-labs/honcho/blob/ddbb90e36f2d148c7982f6ed85b09d31cabf5944/mcp/README.md)
 - [Honcho memory skill](https://github.com/plastic-labs/honcho/blob/ddbb90e36f2d148c7982f6ed85b09d31cabf5944/skills/honcho-memory/SKILL.md)
 - [Honcho TypeScript SDK](https://github.com/plastic-labs/honcho/tree/ddbb90e36f2d148c7982f6ed85b09d31cabf5944/sdks/typescript)
+- DeepSeek RLM source at the exact revision recorded in `provenance/upstreams.json`, especially the public DSH tool bridge, per-session artifact layout, and empty-by-default kernel environment contracts.
 
 The repository MUST include machine-readable upstream provenance before code is released. Floating branches and unpinned release dependencies are forbidden in release builds. An upstream upgrade MUST update this table, compatibility tests, and recorded digests or lockfile entries.
 
@@ -82,15 +93,18 @@ The implementation MUST:
 8. fail open during Honcho latency, outage, authentication failure, or processing lag;
 9. keep credentials and raw secrets out of model context, RLM kernels, events, telemetry, and logs;
 10. support hosted and self-hosted Honcho through configuration;
-11. expose a small safe memory tool set through normal DSH tool policy; and
-12. ship as individually composable Cordis packages plus one installable DSH bundle.
+11. expose a small safe memory tool set through normal DSH tool policy;
+12. ship as individually composable Cordis packages plus one installable DSH bundle;
+13. preserve exact, potentially snapshot-oversized experimental results without putting them in Honcho or the RLM namespace snapshot;
+14. let a later RLM session discover a relevant experiment semantically, resolve its exact local artifact under host-controlled project scope, and slice it deliberately; and
+15. remain useful during Honcho lag or outage through immediate local-card lookup and the existing durable remote outbox.
 
 ## 5. Non-goals
 
 The first stable release MUST NOT:
 
 - replace DSH's session log, compaction, task state, goal service, or subagent service;
-- store source trees, artifacts, full event logs, raw tool arguments/results, system prompts, internal reasoning, or partial assistant streams in Honcho;
+- store source trees, artifact bytes, full event logs, raw tool arguments/results, system prompts, internal reasoning, or partial assistant streams in Honcho;
 - treat Honcho as current-code truth, a vector database for the whole repository, or evidence-grade provenance;
 - automatically model RLM children or other subagents as the human peer;
 - inject an entire representation on every agent step;
@@ -99,6 +113,15 @@ The first stable release MUST NOT:
 - block a turn on asynchronous Honcho derivation or “dreaming”;
 - claim exactly-once delivery under arbitrary remote failures without evidence; or
 - require a DSH host patch when the public plugin contracts are sufficient.
+
+The artifact extension additionally MUST NOT:
+
+- become a second transcript, vector database, general document-management system, or replacement for Honcho search;
+- automatically capture every IPython cell, variable, dataframe, query result, or tool result;
+- copy full DSH conversation history into one or many RLM snapshot variables;
+- treat an artifact as fresh without explicit source-version evidence;
+- send raw result rows, artifact paths, raw queries, or local-card contents to Honcho by default; or
+- require a `deepseek-rlm` production-code change before the host-tool implementation has been attempted through existing public seams.
 
 ## 6. Repository and package layout
 
@@ -111,6 +134,7 @@ The implementation MUST be a pnpm workspace with this logical layout:
 │   ├── honcho-sdk/          # @deepseek-honcho/dsh-honcho-sdk: SDK Service Provider
 │   ├── agent-memory/        # lifecycle capture + recall Consumer
 │   ├── tool-memory/         # minimal model-facing tool Consumer
+│   ├── artifact-memory/     # exact artifact store + experiment-card Consumer
 │   └── bundle/              # installable DSH bundle and example patch
 ├── skills/
 │   └── honcho-memory/       # DSH-adapted MCP experiment skill
@@ -128,7 +152,7 @@ The implementation MUST be a pnpm workspace with this logical layout:
 └── IMPLEMENTATION_PROMPT.md
 ```
 
-Package names MAY be revised before first publication, but the Service Definition, Service Provider, lifecycle Consumer, tool Consumer, and bundle responsibilities MUST remain separable. The Service Definition MUST NOT depend on the SDK provider or Consumers.
+Package names MAY be revised before first publication, but the Service Definition, Service Provider, lifecycle Consumer, tool Consumer, artifact-memory Consumer, and bundle responsibilities MUST remain separable. The Service Definition MUST NOT depend on the SDK provider or Consumers. The artifact-memory package MAY depend on the provider-neutral `ctx.honcho` contract and public DSH services, but MUST NOT depend on the concrete SDK provider.
 
 ## 7. Ownership boundary
 
@@ -140,11 +164,14 @@ Package names MAY be revised before first publication, but the Service Definitio
 | Exact session/event history and compaction | DSH |
 | Root/child lineage | DSH |
 | RLM process and session-scoped computation | DeepSeek RLM |
+| Exact experimental result computation and deliberate slicing | DeepSeek RLM |
+| Immutable project-scoped result bytes and local experiment cards | artifact-memory Consumer |
+| Artifact access authorization and tool logging | DSH `ctx.tools` plus artifact-memory Consumer |
 | Honcho client, identity mapping, recall, record operations | `ctx.honcho` provider |
 | Capture scheduling and prompt injection | agent-memory Consumer |
 | Pending remote deliveries | local outbox; DSH events remain source history |
 | Cross-session derived memory | Honcho |
-| Current source/artifact truth | repository, files, tests, CI |
+| Current source/data/artifact truth | repository, files, tests, CI, and integrity-checked local artifacts |
 
 Any implementation that lets Honcho drive an agent loop or lets recalled memory override current repository evidence violates this specification.
 
@@ -502,7 +529,7 @@ Timeout, open circuit, missing configuration, asynchronous Honcho processing lag
 
 `@deepseek-honcho/dsh-tool-memory` MUST register normal DSH tools through `ctx.tools`, subject to DSH filtering, policy, cancellation, logging, and telemetry.
 
-The default bundle MUST expose only:
+The v0.1 default bundle MUST expose only:
 
 | Tool | Purpose | Important limits |
 | --- | --- | --- |
@@ -511,6 +538,8 @@ The default bundle MUST expose only:
 | `memory_record` | store an explicit durable note or decision | source-labeled; size/redaction rules |
 | `memory_correct` | append an explicit correction/supersession record | preserves history; does not silently delete old evidence |
 | `memory_status` | report configuration/circuit/outbox health | never returns keys or message contents |
+
+When and only when artifact memory is explicitly configured, the bundle MAY additionally expose the two tools defined in section 31: `memory_artifact_record` and `memory_artifact_resolve`. `memory_search` remains the only search surface and MUST merge bounded local experiment-card matches with Honcho results. Artifact tools MUST be absent when artifact memory is disabled.
 
 Tool descriptions MUST tell the model to re-read current code and tests for implementation facts. Tool output MUST label memory as fallible and provide source IDs/dates when available.
 
@@ -529,6 +558,10 @@ DeepSeek RLM kernels run with OS authority and are not sandboxes. This integrati
 - child memory calls carry DSH session/lineage authority and cannot choose an arbitrary configured human identity by default; and
 - automatic child capture/injection remains disabled unless a later spec defines safe peer semantics.
 
+For artifact memory, Python MUST first write an explicit file beneath the dedicated `exports/` directory of its exact current RLM session and then call `memory_artifact_record` through `dsh_tools.call()`. The host MUST independently derive and validate that directory from configured `rlmArtifactRoot` plus the exact caller SessionId; it MUST NOT trust a caller-provided project, session, root, or artifact destination. Restricting ingest to `exports/` prevents the tool from registering RLM snapshots, manifests, harness state, or other session-internal files. Resolving an artifact MUST likewise traverse `memory_artifact_resolve` before Python opens the returned local path.
+
+The first artifact-memory implementation MUST use the existing public RLM filesystem and DSH tool contracts. A convenience Python proxy such as `memory.experiments` MAY be added later, but it MUST be reconstructable, contain no credential, route every host operation through DSH tools, and never cause conversation history or artifact bytes to enter the RLM namespace snapshot.
+
 The project MUST include an integration test that calls `memory_search` from RLM, verifies DSH tool logging, and verifies the key is absent from the kernel environment.
 
 ## 16. Configuration
@@ -545,6 +578,7 @@ The logical configuration surface MUST cover:
 | Capture | `off` or `completed-root-turns`; limits; redactors; assistant observation |
 | Recall | `off` or `first-root-step`; timeout; item/token limits; cache; dialectic policy |
 | Outbox | absolute state root, concurrency, drain timeout, retry/backoff, dead-letter threshold |
+| Artifact memory | explicit enable flag, absolute RLM ingest root, absolute project artifact root, byte/card quotas, integrity policy, local-search bounds |
 | Tools | per-tool enable flags; destructive/admin tools unavailable in this package |
 | Metadata | optional repository ID and commit providers; never fabricate missing values |
 | Observability | metric prefix, content-free diagnostic level |
@@ -570,9 +604,11 @@ The implementation MUST assume:
 
 - Capture and injection default to off until configured explicitly.
 - The outbox state root MUST be documented as sensitive and created with the narrowest practical permissions.
+- The artifact root and experiment cards MUST be documented as sensitive and created with the narrowest practical permissions.
 - Logs/metrics MUST exclude contents, API keys, Authorization headers, and raw peer IDs when a stable hash suffices.
 - Recalled text MUST be data-delimited and labeled untrusted.
 - Workspace/human/project scope MUST be applied host-side; the model MUST NOT choose arbitrary peer IDs in normal tools.
+- Artifact ingest MUST be confined to the exact caller's RLM session `exports/` directory; artifact resolve MUST be confined to the host-configured project and integrity-checked local card.
 - Secret redaction MUST occur before durable outbox storage.
 - Test fixtures MUST use synthetic content and fake credentials.
 - Repository CI MUST scan committed files/package artifacts for known test secrets and environment leaks.
@@ -591,6 +627,7 @@ The provider and Consumers MUST emit content-free structured diagnostics and met
 - operation latency histograms;
 - circuit state transitions;
 - identity/scope rejection counts; and
+- artifact admitted/deduplicated/rejected bytes, local-card hits, remote-card hits, pending-index cards, resolve outcomes, integrity failures, stale/unverifiable results, and quota rejections; and
 - plugin version, schema version, and upstream compatibility version.
 
 `memory_status` MUST expose a safe subset. Debug logging MUST not become a bypass for the content restrictions.
@@ -606,6 +643,7 @@ The provider and Consumers MUST emit content-free structured diagnostics and met
 - Plugin disposal/HMR MUST stop new work, abort recalls, drain uploads within a bound, and relinquish exclusive outbox-worker ownership.
 - A new generation MUST safely recover pending deliveries.
 - Concurrent root sessions MUST never share buffers or inject one another's recall.
+- Artifact objects and cards MUST publish atomically, remain project-scoped, tolerate concurrent identical registration, and leave recoverable local state when Honcho indexing is delayed.
 
 ## 20. Compatibility and host patches
 
@@ -645,6 +683,7 @@ At minimum:
 - first-step-only scheduling across restart/compaction fixtures;
 - cancellation and fail-open behavior;
 - tool schema validation and destructive-tool absence; and
+- artifact/card schema validation, deterministic IDs, path containment, content hashing, quotas, local search, merge ordering, freshness labels, and integrity caching; and
 - secret-free status/log snapshots.
 
 ### 21.2 Integration tests
@@ -660,6 +699,7 @@ Required integration cases:
 - an unavailable/slow Honcho endpoint does not prevent an assistant response;
 - a child session neither captures nor injects automatically;
 - an RLM `dsh_tools.call('memory_search', ...)` passes through DSH policy and logging without receiving the key; and
+- an RLM result larger than the default per-variable snapshot cap is registered, found in a new DSH session, resolved through DSH policy, and read exactly without artifact bytes entering Honcho or a kernel snapshot; and
 - HMR replaces the worker without duplicate delivery.
 
 ### 21.3 Live tests
@@ -684,7 +724,13 @@ The repository MUST include a deterministic evaluation runner with at least thes
 8. stored prompt-injection text rendered as inert memory data;
 9. no root memory learned from subagent messages;
 10. service timeout/outage with normal DSH completion; and
-11. bounded tokens and latency under a long memory history.
+11. bounded tokens and latency under a long memory history;
+12. immediate local discovery of an experiment card while Honcho processing is delayed;
+13. semantic cross-session discovery followed by exact artifact resolution;
+14. exact query-fingerprint reuse versus semantically similar but non-identical experiments;
+15. stale and unverifiable source-version labeling;
+16. corrupt, missing, oversized, and cross-project artifacts failing safely; and
+17. stored artifact-card prompt injection remaining inert.
 
 Promotion from MCP experiment to default native recall requires:
 
@@ -770,11 +816,47 @@ Acceptance: DSH policy/logging governs every tool, and the Honcho key is absent 
 
 Acceptance: Definition of Done below is satisfied and no hidden DSH host patch is required.
 
+### Milestone 8 — artifact contracts and local store
+
+- provider-neutral artifact/card types and validation;
+- project-scoped content-addressed object layout;
+- atomic local cards, deterministic IDs, quotas, and integrity checks;
+- fake/test provider and content-free status.
+
+Acceptance: a synthetic result larger than the RLM per-variable snapshot cap is registered idempotently, survives process restart, remains outside Honcho, and fails safely after corruption.
+
+### Milestone 9 — Honcho experiment-card indexing
+
+- sanitized remote-card projection;
+- deterministic outbox delivery and pending-card reconciliation;
+- assistant/project attribution rather than human-preference attribution;
+- project-filtered experiment-card recall with safe metadata.
+
+Acceptance: a local card is immediately searchable before remote processing and becomes semantically discoverable in a later synthetic DSH session without uploading artifact bytes, raw queries, or local paths.
+
+### Milestone 10 — RLM record/resolve path
+
+- opt-in `memory_artifact_record` and `memory_artifact_resolve` tools;
+- local-plus-Honcho merge in `memory_search`;
+- exact caller-session ingest validation and project-scoped resolve;
+- RLM prompt guidance and real `dsh_tools.call()` integration tests.
+
+Acceptance: a real RLM kernel writes a result file, records it through DSH, later resolves it from a distinct root session, verifies freshness/integrity, and deliberately prints only a bounded slice.
+
+### Milestone 11 — artifact evaluation, operations, and packaging
+
+- deterministic artifact-memory corpus and memory-disabled baseline;
+- outage, lag, stale-source, prompt-injection, quota, isolation, restart, HMR, and platform tests;
+- retention, inspection, backup, migration, and operator-only cleanup documentation;
+- bundle/example configuration with synchronized RLM and artifact roots.
+
+Acceptance: the artifact extension Definition of Done in section 35 is satisfied without weakening any v0.1 memory guarantee.
+
 ## 24. Definition of Done
 
 The project is ready for a first release only when:
 
-1. all milestones and section 22 promotion gates pass;
+1. all applicable milestones and section 22 promotion gates pass;
 2. the exact upstream revisions/dependencies and license notices are recorded;
 3. the native bundle installs in a clean pinned DSH profile;
 4. capture and recall are explicit opt-ins and fail open remotely;
@@ -786,7 +868,8 @@ The project is ready for a first release only when:
 10. Windows and Ubuntu CI pass and macOS release intent is documented;
 11. hosted data egress, self-hosting, local outbox sensitivity, retention/export/deletion, and non-sandbox boundaries are documented;
 12. a license has been selected for this repository after the dependency/source-use review; and
-13. the README describes actual verified behavior without calling an experiment production-ready.
+13. the README describes actual verified behavior without calling an experiment production-ready; and
+14. when artifact memory is included in the release, section 35 is satisfied and its optional tools remain absent unless explicitly configured.
 
 ## 25. Deferred decisions
 
@@ -798,4 +881,466 @@ These require evidence from implementation or the MCP experiment and MUST remain
 - whether an operator-only administration CLI belongs in this repository;
 - whether self-hosted deployments need a bundled MCP worker (subject to AGPL review);
 - whether safe child-agent memory semantics warrant a separate peer/scope model; and
-- final repository/package license.
+- final repository/package license;
+- whether a future provider should support remote object storage in addition to the local filesystem;
+- whether SQLite/FTS is justified after measuring local-card scale; and
+- whether a public RLM bootstrap extension is worth adding for a reconstructable `memory.experiments` convenience proxy.
+
+## 26. Artifact-memory revision scope and invariants
+
+Sections 26–35 define the v0.2 artifact-memory extension. They are normative for Milestones 8–11 and additive to the v0.1 baseline. If an extension requirement conflicts with a v0.1 safety or authority rule, the v0.1 rule wins until this specification is deliberately revised.
+
+The extension MUST be implemented in this repository as an optional, separately installable package. It MUST use the existing RLM filesystem and `dsh_tools.call()` boundary. A generic upstream RLM change MAY be proposed only after a failing integration test proves the public boundary insufficient.
+
+Implementation evidence on 2026-08-21 proved one narrowly missing part of that boundary at RLM revision `79b6b28e16c7305e8e791f2d8c9d2935e75ade60`: with `adapters.tools` enabled, a real kernel's `dsh_tools.call()` reached `HostBridge.callTool()` but Cordis rejected the provider's undeclared `ctx.tools` property access with `cannot get property "tools" without inject`. The approved upstream exception is limited to resolving the already-optional live ToolRuntime through `ctx.get('tools')` at the `dsh_tools.list` and `dsh_tools.call` dispatch sites, returning a stable unavailable-adapter error when absent, and adding the corresponding real provider regression test. No broader RLM ownership, credential, policy, filesystem, or agent-loop change is authorized or required by this revision.
+
+The architectural split is:
+
+| Component | Owns | Does not own |
+| --- | --- | --- |
+| DSH | sessions, identity, project scope, policy, tool authorization, lifecycle, logging | result computation or semantic memory processing |
+| DeepSeek RLM | live Python kernel, exact computation, deliberate slicing and inspection | durable cross-session discovery, credentials, or authorization |
+| Artifact memory | immutable project-scoped result bytes, experiment cards, integrity, exact resolution | general conversation memory or model policy |
+| Honcho | semantic discovery of sanitized experiment cards and existing conversational memory | artifact bytes, local paths, current source truth, or authorization |
+
+These invariants are mandatory:
+
+1. Exact artifact bytes remain local in the configured artifact root in v0.2.
+2. Honcho receives only a bounded, redacted experiment-card projection; never artifact bytes, source paths, raw queries, or credentials.
+3. A local card is committed before remote indexing is attempted, so local discovery works while Honcho is unavailable or processing asynchronously.
+4. DSH derives the caller session and project scope. The model MUST NOT choose an arbitrary session root, project, workspace, or human peer.
+5. Artifact lookup augments rather than replaces the current RLM kernel. The kernel loads and slices only the result needed for the current step.
+6. Artifact identity is immutable and content-addressed. Descriptions and semantic metadata MAY evolve without changing the underlying artifact identity.
+7. Recalled cards are untrusted hints. A reference is usable only after project-scope, existence, and integrity validation.
+8. The extension MUST remain useful without Honcho. Honcho improves semantic rediscovery; it is not the local artifact catalog or source of truth.
+9. The extension MUST NOT introduce another transcript store, vector database, agent loop, or automatic capture of every Python value.
+10. Snapshot variables MUST contain only bounded references or search results, never full conversation history or large artifact bytes.
+
+## 27. Artifact and experiment-card contracts
+
+### 27.1 Artifact identity and reference
+
+The implementation MUST stream artifact bytes through SHA-256 without reading the complete file into host memory. The canonical artifact ID is:
+
+```text
+artifactId = "art_" + base32url(sha256(artifactBytes))
+```
+
+`base32url` means lowercase RFC 4648 base32 without padding. Equivalent collision-resistant text encoding MAY be adopted only before the first release and MUST be fixed by schema version and test vectors.
+
+An `ArtifactRefV1` contains only:
+
+```ts
+interface ArtifactRefV1 {
+  schemaVersion: 1
+  artifactId: string
+  sha256: string
+  bytes: number
+  mediaType: string
+  createdAt: string
+}
+```
+
+The portable reference MUST NOT contain an absolute path. A resolved local path is a short-lived, project-authorized tool result, not persistent semantic memory.
+
+### 27.2 Experiment identity
+
+The caller MUST provide a lowercase SHA-256 `queryFingerprint` over a stable, locally chosen representation of the query or computation plus relevant parameters. The raw query or code need not be retained and MUST NOT be sent to Honcho.
+
+The caller MUST also provide `sourceVersion`, such as a dataset version, immutable object version, snapshot timestamp, or source commit. The literal `unknown` is allowed, but it makes freshness unverifiable.
+
+The canonical experiment ID is a digest of a canonical JSON object containing:
+
+- schema version;
+- DSH project ID;
+- artifact ID;
+- query fingerprint; and
+- source version.
+
+```text
+experimentId = "exp_" + base32url(sha256(canonicalIdentityJson))
+```
+
+Title, summary, tags, and display metadata MUST NOT affect experiment identity. Re-recording the same identity is idempotent and MAY update only allowed descriptive fields and index status.
+
+### 27.3 Local experiment card
+
+The complete local `ExperimentCardV1` MUST include:
+
+- `schemaVersion`, `experimentId`, and `artifact: ArtifactRefV1`;
+- bounded `title` and `summary`;
+- `queryFingerprint`, `source`, and `sourceVersion`;
+- optional bounded `shape`, `columns`, and `tags`;
+- DSH project ID, originating session ID, root-agent ID, and tool-call ID when available;
+- plugin/package version and creation/update timestamps; and
+- Honcho index state: `pending`, `queued`, `indexed`, `failed`, or `disabled`, with bounded last-error and attempt metadata.
+
+Cards MUST validate on both write and read. Unknown future schema versions MUST fail with a typed unsupported-version error rather than being guessed.
+
+### 27.4 Remote experiment card
+
+The Honcho projection MUST be independently constructed from allowlisted fields. It SHOULD contain a concise natural-language description plus safe metadata sufficient for semantic discovery and exact local lookup:
+
+- content classification `experiment-card`;
+- experiment ID and artifact ID;
+- project ID;
+- query fingerprint and source version;
+- bounded source label, title, summary, shape, column names, and tags after redaction;
+- DSH session/tool correlation IDs where policy permits; and
+- schema and plugin versions.
+
+Remote experiment cards MUST be attributed to the configured assistant peer and project observation scope, not recorded as a human preference or autobiographical fact. Existing user-memory recall MUST NOT present an experiment card as a user trait.
+
+## 28. Local storage, integrity, and resource limits
+
+### 28.1 Project-scoped layout
+
+The artifact root is host configuration and MUST resolve independently of an RLM session directory. Each project receives a deterministic path-safe key derived from its DSH project ID:
+
+```text
+<artifactRoot>/projects/<projectKey>/
+  objects/<first-two-digest-chars>/<artifactId>
+  cards/<experimentId>.json
+  tmp/
+```
+
+`projectKey` MUST be a one-way deterministic digest of the project ID. Physical object deduplication MUST remain inside one project in v0.2; identical bytes in two projects MUST NOT produce a shared file or a cross-project existence side channel.
+
+The RLM ingest root is configured separately and MUST match the root used by DSH to create RLM sessions:
+
+```text
+<rlmArtifactRoot>/sessions/<callerSessionId>/exports/
+```
+
+The host MUST construct that exact export path from its authenticated caller context. A model-provided session ID or arbitrary ingest root is invalid. Files elsewhere in the session directory, including snapshots, manifests, runtime metadata, connection data, and harness state, MUST remain ineligible for artifact ingest.
+
+### 28.2 Path and filesystem safety
+
+Before reading a source artifact, the host MUST:
+
+1. reject empty, relative, device, network-share, and alternate-data-stream paths unless a platform-specific test explicitly allows them;
+2. resolve the final path and every existing parent;
+3. prove containment within the exact caller-session ingest directory;
+4. reject symlinks, junctions, reparse points, hard-link escapes where detectable, and non-regular files;
+5. open with sharing and no-follow behavior appropriate to the platform; and
+6. verify that the file identity and size did not change during streaming.
+
+Containment MUST use path-component semantics, not string prefixes. Windows and POSIX behavior MUST have dedicated tests.
+
+### 28.3 Atomic commit and concurrency
+
+Ingest MUST stream to a unique temporary file inside the destination project, enforce limits while streaming, flush it, and atomically publish the content-addressed object. Concurrent identical ingests MUST converge on one valid object and deterministic card without truncation. Temporary files left by crashes MUST be recognizable and recoverable without deleting valid objects.
+
+Cards MUST use versioned atomic replacement. Object publication and card publication are the local commit; remote indexing happens afterward. If card publication fails, the new unreferenced object MAY remain for operator inspection but MUST NOT be returned as a successful record.
+
+### 28.4 Integrity verification
+
+The artifact hash MUST be verified while recording. Resolution MUST check the stored size and SHA-256 before returning a usable path. The default MAY use a process-local verification cache keyed by project, artifact ID, file identity, size, and modification time, but the first resolve in a process and every observed file change MUST rehash. An `always` verification mode MUST be available.
+
+Missing, truncated, replaced, or corrupt objects fail closed with typed errors. They MUST NOT be silently redownloaded from Honcho because Honcho never owns the bytes.
+
+### 28.5 Default bounds
+
+All bounds MUST be configurable downward by operators and validated at startup. Initial defaults are:
+
+| Bound | Default |
+| --- | ---: |
+| one artifact | 1 GiB |
+| one project total | 20 GiB |
+| cards per project | 10,000 |
+| title | 200 UTF-8 characters |
+| summary | 2,000 UTF-8 characters |
+| tags | 20 entries, 80 characters each |
+| columns | 256 entries, 128 characters each |
+| local search results | 20 |
+
+Quota checks MUST be race-safe enough that concurrent writers cannot create unbounded growth. An implementation MAY temporarily exceed a project byte limit by at most the sum of in-flight, individually permitted writes; it MUST document and test that bound.
+
+There is no automatic garbage collection in v0.2. Inspection, export, deletion, and orphan cleanup are operator-only capabilities and MUST NOT be exposed as model tools.
+
+## 29. Recording and Honcho indexing
+
+### 29.1 Record workflow
+
+`memory_artifact_record` performs this ordered workflow:
+
+1. derive caller session, root agent, project, and tool correlation from DSH context;
+2. validate feature enablement, metadata, source path, containment, and quotas;
+3. stream, hash, and atomically publish or deduplicate the project object;
+4. create or atomically update the deterministic local card with `pending` index state;
+5. construct the sanitized remote projection;
+6. admit a deterministic Honcho note to the existing durable outbox; and
+7. atomically mark the local card `queued` when outbox admission succeeds.
+
+Steps 1–4 are the synchronous local operation. Honcho processing MUST NOT be awaited. A successful response reports local durability separately from remote queueing.
+
+If outbox admission fails, the local card remains `pending`; the artifact record still succeeds locally and reports `honchoQueued: false`. Startup and background reconciliation MUST periodically re-enqueue pending/failed projections through the same idempotent delivery path. Reconciliation MUST be bounded, cancellable, HMR-safe, and subject to the existing Honcho circuit breaker.
+
+### 29.2 Remote idempotency and state
+
+The delivery ID MUST be deterministic from the provider namespace, project ID, experiment ID, remote-card schema version, and sanitized projection revision. Retry, ambiguous success, restart, and reconciliation MUST NOT create semantically duplicated cards.
+
+The provider SHOULD update a card to `indexed` only when the configured Honcho API provides reliable evidence of acceptance/availability. Otherwise `queued` means durably accepted by the local outbox, not semantically searchable. Status wording and metrics MUST preserve this distinction.
+
+Remote-card corrections create a new projection revision or explicit superseding note. They MUST NOT mutate artifact bytes or erase historical identity.
+
+### 29.3 Sanitization and trust
+
+The projection uses the same secret redaction, Unicode normalization, size limits, and content exclusions as lifecycle capture, plus artifact-specific allowlisting. Metadata supplied by the kernel is untrusted. Raw SQL, Python source, parameter values, row samples, file paths, connection strings, environment values, and opaque nested objects MUST be excluded unless a future explicit schema safely admits them.
+
+If the sanitized summary becomes empty, local recording still succeeds; remote indexing is skipped with a typed reason visible in safe status metadata.
+
+## 30. Search, resolution, and RLM use
+
+### 30.1 Hybrid discovery
+
+When artifact memory is enabled, `memory_search` MUST combine:
+
+1. immediate project-local card search; and
+2. existing bounded Honcho semantic search for remote experiment cards and normal memory.
+
+Local search MUST support exact experiment ID, artifact ID, query fingerprint, tag, and source-version matches; recent-card ordering; and bounded normalized lexical matching over allowlisted card fields. v0.2 SHOULD use the filesystem cards and an in-memory bounded index rebuilt at startup. It MUST NOT add SQLite, FTS, or another embedding/vector service without measured evidence and a spec revision.
+
+Honcho and local work SHOULD run concurrently under independent deadlines. Results are merged deterministically, deduplicated by experiment ID, and labeled with source, trust, index state, and whether an exact local artifact is available. Exact local matches rank ahead of semantic matches. A Honcho failure MUST NOT suppress local results or normal task execution.
+
+Cross-project results are forbidden even if Honcho returns them. Every remote experiment card MUST pass current DSH project validation before inclusion.
+
+### 30.2 Exact resolution
+
+`memory_artifact_resolve` accepts an experiment ID and optional current source version. It MUST:
+
+1. derive the current DSH project from caller context;
+2. load and validate only that project's card;
+3. validate object containment, size, and integrity;
+4. compare the optional current source version; and
+5. return a bounded metadata object plus the absolute local object path.
+
+Freshness is one of:
+
+- `fresh`: current source version exactly matches the recorded non-`unknown` version;
+- `stale`: both versions are known and differ;
+- `unverifiable`: either version is `unknown` or absent under a requested comparison; or
+- `not_checked`: the caller did not request a comparison.
+
+A stale artifact MAY resolve for historical comparison, but the result MUST carry an explicit warning. Missing or corrupt artifacts MUST NOT resolve. The absolute path MAY appear only in the authorized DSH tool result and RLM kernel action; it MUST NOT enter Honcho projections, routine status output, diagnostics, or captured lifecycle memory.
+
+### 30.3 Intended RLM workflow
+
+The RLM kernel writes an intentional result file beneath the dedicated `exports/` directory of its current DSH-created session, then asks DSH to record it:
+
+```python
+import os
+from pathlib import Path
+
+exports = Path(os.environ["RLM_SESSION_DIR"]) / "exports"
+exports.mkdir(mode=0o700, exist_ok=True)
+result_path = exports / "treatment-response.parquet"
+
+recorded = await dsh_tools.call("memory_artifact_record", {
+    "source_path": result_path,
+    "title": "Treatment response by cohort",
+    "summary": "Aggregate response table for the preregistered cohort comparison.",
+    "query_fingerprint": stable_query_fingerprint,
+    "source": "trial-warehouse",
+    "source_version": dataset_snapshot,
+    "media_type": "application/vnd.apache.parquet",
+    "tags": ["cohort", "response"],
+})
+```
+
+In a later session it searches, resolves, then loads and deliberately slices the exact result:
+
+```python
+hits = await dsh_tools.call("memory_search", {"query": "cohort treatment response"})
+resolved = await dsh_tools.call("memory_artifact_resolve", {
+    "experiment_id": hits[0]["experiment_id"],
+    "current_source_version": dataset_snapshot,
+})
+table = pandas.read_parquet(resolved["path"])
+relevant_rows = table.loc[table["cohort"].isin(target_cohorts), desired_columns]
+```
+
+These examples are conceptual; shipped examples MUST match actual DSH tool schemas. The kernel MAY retain `hits`, `resolved`, or a small slice as normal snapshot variables. It SHOULD NOT retain the full table when it exceeds snapshot bounds.
+
+A future RLM bootstrap MAY expose a reconstructable convenience proxy such as `memory.experiments`, but it is not required for v0.2. Such a proxy MUST contain no credential, authorization, data, or durable state and MUST reduce to DSH tool calls.
+
+## 31. Package, service, and tool contracts
+
+### 31.1 Package boundary
+
+Add an optional package named `@deepseek-honcho/dsh-artifact-memory`. It SHOULD depend on the provider-neutral Honcho service contract and DSH public APIs, not on the concrete Honcho SDK. It owns:
+
+- artifact/card schemas and validation;
+- local store and project index;
+- sanitized remote-card projection and reconciliation;
+- `memory_artifact_record` and `memory_artifact_resolve`; and
+- a consumer service used by `memory_search` for local artifact hits.
+
+The native bundle mounts this package before the memory tool consumer only when explicitly enabled. The tool consumer MUST treat the artifact service as optional; existing installations and the original five tools behave unchanged when it is absent.
+
+The package MUST be independently unit-testable with fake DSH caller context, a temporary filesystem, and the fake Honcho provider. It MUST introduce no native binary dependency in v0.2 unless unavoidable and deliberately approved.
+
+### 31.2 Record tool schema
+
+Required model inputs:
+
+- `source_path`;
+- `title`;
+- `summary`;
+- `query_fingerprint`;
+- `source`; and
+- `source_version`.
+
+Optional inputs are `media_type`, `tags`, `shape`, and `columns`. The schema MUST reject unknown or oversized nested content.
+
+The bounded result includes:
+
+- `experiment_id`, `artifact_id`, `sha256`, and `bytes`;
+- `local_saved`, `deduplicated`, and `honcho_queued`;
+- `index_state`; and
+- safe warnings or typed error code.
+
+The caller MUST NOT supply project ID, session ID, destination path, peer ID, delivery ID, or remote metadata.
+
+### 31.3 Resolve tool schema
+
+Required model input: `experiment_id`. Optional input: `current_source_version`.
+
+The bounded result includes the validated `path`, artifact metadata, card display metadata, `freshness`, `verified_at`, and safe warnings. It MUST NOT include Honcho credentials, internal outbox paths, other project identifiers, or raw remote responses.
+
+### 31.4 Search integration
+
+Artifact hits returned through `memory_search` MUST use a distinct `kind: "experiment-card"` discriminant with `experiment_id`, `artifact_id`, safe display metadata, freshness evidence when known, local availability, and index state. Normal Honcho memories retain their existing schema. Formatters MUST make the distinction obvious to both the model and logs.
+
+The artifact package MUST NOT add delete, purge, arbitrary-path read, arbitrary-project search, arbitrary-peer search, raw-Honcho query, or shell execution tools.
+
+## 32. Configuration and security
+
+Artifact memory is disabled by default. Enabling it requires all of:
+
+- an artifact root;
+- an RLM session root that matches the DSH/RLM configuration;
+- explicit tool enablement; and
+- an assistant peer ID when Honcho indexing is enabled.
+
+The configuration schema MUST include at least:
+
+- `enabled`;
+- `artifactRoot`;
+- `rlmArtifactRoot`;
+- per-artifact, per-project, card-count, and metadata bounds;
+- integrity mode `cached` or `always`;
+- local search result and time bounds;
+- remote indexing enablement;
+- reconciliation interval/batch/concurrency bounds; and
+- retention/cleanup policy status, initially `operator-only`.
+
+Startup validation MUST reject overlapping or dangerous roots, including a filesystem root, home directory, repository root, DSH profile root, Honcho outbox root, or an artifact root nested inside the RLM session root. The two roots MUST be resolved and recorded in content-free diagnostics.
+
+Filesystem permissions SHOULD restrict artifact objects and cards to the DSH host account. Documentation MUST treat the artifact root as sensitive scientific/user data that may contain secrets, personal information, or regulated records. Honcho egress documentation MUST separately enumerate every field in the remote card.
+
+DSH policy remains authoritative for both tools. Tool calls MUST be logged using bounded, redacted metadata. Lifecycle capture MUST exclude artifact tool arguments/results and resolved paths to avoid creating a semantic or conversational copy.
+
+## 33. Lifecycle, observability, and failure behavior
+
+The artifact service MUST participate in normal DSH start, abort, restart, HMR, and shutdown semantics. Startup builds a bounded local card index and reconciles eligible pending cards. Shutdown stops new records, cancels searches, finishes or rolls back local atomic writes, and performs only the existing bounded outbox drain.
+
+At most one active reconciler may own a project/card generation. HMR fencing MUST prevent a stale instance from publishing index-state changes after replacement. Crash recovery MUST ignore incomplete temporary files and preserve valid objects/cards.
+
+Safe status and metrics SHOULD include:
+
+- enabled/disabled state and schema version;
+- project card/object counts and bytes, without names or content;
+- record attempts, successes, deduplications, quota/path/integrity failures;
+- local search latency/results and remote merge latency/failures;
+- resolve successes, stale/unverifiable results, and corrupt/missing failures;
+- pending/queued/indexed/failed card counts;
+- reconciliation attempts/successes/failures; and
+- current integrity mode and configured bounds.
+
+They MUST NOT include titles, summaries, tags, columns, source paths, resolved paths, raw project IDs, raw query fingerprints, artifact content, or credentials.
+
+Required failure behavior:
+
+| Failure | Required behavior |
+| --- | --- |
+| Honcho unavailable, unauthorized after valid startup, timed out, or processing slowly | Local record/search/resolve continue; card stays pending/queued; normal turn fails open. |
+| RLM kernel exits or session is compacted | Committed objects/cards survive; later discovery does not require the old kernel or snapshot. |
+| Source version changed | Resolve returns `stale` warning when the caller requests comparison; never claims current truth. |
+| Artifact missing or corrupt | Resolution fails closed and emits content-free diagnostics. |
+| Local card malformed or unsupported | Skip it from search, fail direct resolution safely, and surface an operator diagnostic. |
+| Quota reached | Reject before successful commit; do not delete older data automatically. |
+| Stored prompt injection in card text | Label as untrusted data, bound it, and never execute embedded instructions. |
+| Honcho returns wrong-project card | Discard, count an isolation failure, and return no cross-project detail. |
+| Process crashes during ingest | Recover/ignore temp state; never expose a partial object as valid. |
+
+## 34. Verification and evaluation contract
+
+### 34.1 Required automated tests
+
+At minimum, add tests for:
+
+- deterministic artifact/experiment IDs and canonical serialization;
+- streaming bounds and no whole-file buffering;
+- Windows and POSIX containment, traversal, prefix-collision, symlink/junction/reparse, and non-regular-file rejection;
+- atomicity, concurrent identical/different records, restart, temp recovery, and HMR fencing;
+- project-isolated object/card layout and no cross-project physical deduplication;
+- schema migration rejection, metadata limits, redaction, and remote projection allowlisting;
+- outbox admission failure, deterministic retry, ambiguous success, reconciliation, and Honcho outage;
+- immediate local search, semantic merge, deterministic ranking/deduplication, timeout, and wrong-project filtering;
+- resolution integrity cache, `always` mode, corruption, missing files, and all freshness states;
+- DSH-derived caller identity and rejection of model-selected scope;
+- absence of artifact tools while disabled and absence of destructive/arbitrary-read tools always;
+- lifecycle-capture exclusion of artifact arguments, results, bytes, and paths;
+- package tarball install/import and bundle composition; and
+- a real pinned DSH + RLM bridge in which Python records and later resolves/slices an artifact using `dsh_tools.call()`.
+
+Tests MUST use synthetic content. Live Honcho tests remain opt-in, isolated, and non-destructive.
+
+### 34.2 Evaluation cases
+
+Extend the deterministic evaluation corpus with at least:
+
+1. a result larger than the RLM per-variable snapshot limit;
+2. exact rediscovery by experiment ID and query fingerprint;
+3. semantic rediscovery in a distinct DSH/RLM session;
+4. concurrent record and immediate local search before Honcho processing;
+5. Honcho outage followed by reconciliation;
+6. source-version match, mismatch, and unknown version;
+7. corrupt/missing artifact behavior;
+8. project and peer isolation;
+9. stored prompt injection in title/summary/tag fields;
+10. quota exhaustion and restart recovery; and
+11. a memory-disabled and artifact-disabled baseline.
+
+Report task success, exact-artifact correctness, stale-result warning accuracy, leakage/isolation failures, local and hybrid search latency, resolve/hash latency by artifact size, bytes sent to Honcho, token overhead, and outbox/reconciliation state. Zero artifact bytes, raw source paths, and raw queries may be sent to Honcho.
+
+### 34.3 Promotion gates
+
+In addition to section 22, promotion requires:
+
+- zero cross-project or arbitrary-path reads;
+- zero integrity false-successes;
+- zero lifecycle-memory copies of artifact bytes or resolved paths;
+- deterministic recovery after restart and ambiguous remote success;
+- local record/search/resolve success during injected Honcho outage;
+- bounded model-visible card/token overhead; and
+- documented measurements showing that the extension improves exact-result reuse over semantic memory alone.
+
+## 35. Artifact-extension Definition of Done
+
+The artifact-memory extension is complete only when:
+
+1. Milestones 8–11 and all applicable baseline gates pass;
+2. `@deepseek-honcho/dsh-artifact-memory` installs independently and composes optionally in the native bundle;
+3. disabled configurations expose no artifact tools and preserve baseline behavior;
+4. a real pinned RLM kernel records a synthetic oversized result through DSH without receiving a Honcho credential;
+5. a later independent session finds the experiment locally and semantically, resolves the exact bytes, verifies integrity/freshness, and prints only a deliberate bounded slice;
+6. Honcho contains only the allowlisted redacted card projection and no artifact bytes, raw query, local path, or human-preference misattribution;
+7. local record, search, and resolve remain functional during Honcho outage, with later idempotent reconciliation;
+8. project isolation, path containment, corruption, quota, concurrency, restart, HMR, and platform tests pass;
+9. artifact arguments/results/paths are excluded from lifecycle capture and status/log outputs remain content-free;
+10. no destructive, cleanup, arbitrary-read, arbitrary-scope, or raw-provider operation is model-callable;
+11. README, examples, configuration, security/privacy, data-egress, retention/backup, provenance, package contents, and evaluation reports match verified behavior;
+12. formatting, lint, typecheck, unit, integration, e2e, package, secret, and cross-platform CI checks pass; and
+13. the single approved RLM optional-ToolRuntime lookup change is backed by the failing public-seam test, the minimal generic proposal, this explicit revision, and a passing real provider regression test; no other RLM source change is required.

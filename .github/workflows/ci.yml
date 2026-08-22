@@ -21,8 +21,31 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+      - uses: actions/checkout@v4
+        with:
+          repository: OpenCnid/deepseek-rlm
+          ref: 79b6b28e16c7305e8e791f2d8c9d2935e75ade60
+          path: vendor/deepseek-rlm
+      - name: Apply approved optional-ToolRuntime patch
+        shell: bash
+        run: git -C vendor/deepseek-rlm apply "$GITHUB_WORKSPACE/patches/deepseek-rlm/0001-optional-toolruntime-lookup.patch"
+      - run: pnpm dlx pnpm@9.14.4 --dir vendor/deepseek-rlm install --frozen-lockfile
+      - run: pnpm dlx pnpm@9.14.4 --dir vendor/deepseek-rlm build
+      - name: Verify pinned RLM nested tool regression
+        run: >-
+          pnpm dlx pnpm@9.14.4 --dir vendor/deepseek-rlm exec vitest run
+          --config vitest.integration.config.ts
+          packages/rlm-jupyter/tests/provider.integration.spec.ts
+      - name: Verify real DSH and RLM artifact bridge
+        run: pnpm exec vitest run tests/integration/rlm-artifact-memory.spec.ts
+        env:
+          DEEPSEEK_RLM_CHECKOUT: ${{ github.workspace }}/vendor/deepseek-rlm
 
   release-intent-macos:
     if: github.event_name == 'workflow_dispatch'

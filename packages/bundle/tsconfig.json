@@ -6,6 +6,7 @@
     { "path": "../honcho" },
     { "path": "../honcho-sdk" },
     { "path": "../agent-memory" },
+    { "path": "../artifact-memory" },
     { "path": "../tool-memory" }
   ]
 }
