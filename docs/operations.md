@@ -108,6 +108,20 @@ HONCHO_BASE_URL=https://api.honcho.dev
 
 Then run `pnpm test:e2e`. The fixture creates unique `synthetic_*` peers, project, and session IDs. It does not delete remote resources. Inspect them, record evidence without message content, and perform cleanup using the approved operator process. Never reuse a personal or production peer ID.
 
+### Live artifact/RLM proof
+
+The v0.2 hosted proof requires a built checkout at the exact pinned RLM revision with the repository's approved optional-ToolRuntime patch applied. Keep every opt-in variable session-scoped:
+
+```powershell
+$env:HONCHO_LIVE_TEST = '1'
+$env:HONCHO_LIVE_ARTIFACT_RLM = '1'
+$env:DEEPSEEK_RLM_CHECKOUT = '<built pinned and patched checkout>'
+corepack pnpm check:live-artifact-rlm
+Remove-Item Env:HONCHO_LIVE_TEST, Env:HONCHO_LIVE_ARTIFACT_RLM, Env:DEEPSEEK_RLM_CHECKOUT -ErrorAction SilentlyContinue
+```
+
+The check provisions a uniquely named synthetic workspace, writes its resource manifest before provisioning, records an oversized artifact only through the real RLM `dsh_tools.call()` bridge, verifies the exact assistant-authored backend projection, waits boundedly for a later-session semantic hit, and resolves and hashes the local bytes. Its report contains only booleans, counts, timings, revisions, and egress measurements. The workspace is intentionally retained for inspection and marked `cleanupRequired`; deleting it is a separate operator-authorized action. Never point this check at a personal workspace or replace its generated identities.
+
 ### Full live corpus
 
 The promotion comparison uses freshly provisioned evaluation workspaces rather than `HONCHO_LIVE_WORKSPACE_ID`. The runner writes `evaluation-results/live-resource-manifest.json` before the first remote creation so an interrupted run remains cleanable. The manifest contains resource IDs and timestamps, never the key or conversation content.

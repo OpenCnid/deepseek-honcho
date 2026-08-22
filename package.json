@@ -22,6 +22,7 @@
     "evaluate": "tsx scripts/evaluate.ts && tsx scripts/evaluate-artifacts.ts",
     "evaluate:artifacts": "tsx scripts/evaluate-artifacts.ts",
     "evaluate:live": "tsx scripts/evaluate-live.ts",
+    "check:live-artifact-rlm": "tsx scripts/check-live-artifact-rlm.ts",
     "resume:live": "tsx scripts/resume-live.ts",
     "cleanup:live": "tsx scripts/cleanup-live.ts",
     "check:provenance": "tsx scripts/check-provenance.ts",
