@@ -3,6 +3,7 @@ lib/
 dist/
 coverage/
 artifacts/
+vendor/
 .env
 .env.*
 !.env.example

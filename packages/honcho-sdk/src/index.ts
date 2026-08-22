@@ -12,6 +12,7 @@ import HonchoMemory, {
   HONCHO_SCHEMA_VERSION,
   HonchoMemoryError,
   type HonchoIdentityConfig,
+  type HonchoAgentKind,
   type HonchoRecallItem,
   type HonchoRecallRequest,
   type HonchoRecallResult,
@@ -166,6 +167,15 @@ export class HonchoSdkMemory extends HonchoMemory {
 
   resolveScope(agent: Agent): HonchoScope | undefined {
     return resolveHostScope(agent, this.identity)
+  }
+
+  scopeForSession(dshSessionId: string, agentKind: HonchoAgentKind): HonchoScope {
+    return Object.freeze({
+      ...this.identity,
+      honchoSessionId: honchoSessionId(dshSessionId),
+      dshSessionId,
+      agentKind,
+    })
   }
 
   async ensureScope(scope: HonchoScope, signal?: AbortSignal): Promise<void> {
@@ -339,6 +349,7 @@ export class HonchoSdkMemory extends HonchoMemory {
     }
     const expectedPeer =
       message.role === 'assistant' ||
+      message.role === 'experiment-card' ||
       (request.scope.agentKind === 'child' && (message.role === 'memory-note' || message.role === 'correction'))
         ? request.scope.assistantPeerId
         : request.scope.userPeerId

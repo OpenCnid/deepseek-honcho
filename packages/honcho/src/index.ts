@@ -12,11 +12,11 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 
 export const HONCHO_CONTRACT_VERSION = 1
 export const HONCHO_SCHEMA_VERSION = 'deepseek-honcho/v1'
-export const HONCHO_PLUGIN_VERSION = '0.1.0'
+export const HONCHO_PLUGIN_VERSION = '0.2.0'
 export const HONCHO_ID_PATTERN = /^[A-Za-z0-9_-]{1,512}$/
 
 export type HonchoAgentKind = 'root' | 'child'
-export type HonchoRecordRole = 'user' | 'assistant' | 'memory-note' | 'correction'
+export type HonchoRecordRole = 'user' | 'assistant' | 'memory-note' | 'correction' | 'experiment-card'
 export type HonchoRecallKind = 'representation' | 'message' | 'conclusion' | 'summary'
 export type HonchoCircuitState = 'closed' | 'open' | 'half-open'
 
@@ -62,6 +62,24 @@ export interface HonchoRecallItem {
   readonly sessionId?: string
   readonly createdAt?: string
   readonly score?: number
+  readonly experimentCard?: HonchoExperimentCardItem
+}
+
+/** Allowlisted remote experiment-card fields; opaque provider metadata never crosses the seam. */
+export interface HonchoExperimentCardItem {
+  readonly schemaVersion: 1
+  readonly experimentId: string
+  readonly artifactId: string
+  readonly projectId: string
+  readonly queryFingerprint: string
+  readonly sourceVersion: string
+  readonly source: string
+  readonly title: string
+  readonly summary: string
+  readonly shape?: string
+  readonly columns?: readonly string[]
+  readonly tags?: readonly string[]
+  readonly projectionRevision: number
 }
 
 export interface HonchoRecallResult {
@@ -121,6 +139,8 @@ export abstract class HonchoMemory extends Service {
   }
 
   abstract resolveScope(agent: Agent): HonchoScope | undefined
+  /** Reconstruct host-owned scope for a durable Consumer record after restart. */
+  abstract scopeForSession(dshSessionId: string, agentKind: HonchoAgentKind): HonchoScope
   abstract ensureScope(scope: HonchoScope, signal?: AbortSignal): Promise<void>
   abstract record(request: HonchoRecordRequest): Promise<void>
   abstract recall(request: HonchoRecallRequest): Promise<HonchoRecallResult>

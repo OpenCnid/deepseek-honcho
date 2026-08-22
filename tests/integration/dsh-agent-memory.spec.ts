@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import {
+  CallId,
   createUserMessage,
   LlmAdapter,
   type GenerateOptions,
@@ -9,6 +10,7 @@ import {
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FakeHonchoMemory } from '../../packages/honcho/src/testkit.ts'
 import { HonchoMemoryError } from '../../packages/honcho/src/index.ts'
@@ -45,6 +47,51 @@ class FailedAdapter extends LlmAdapter {
       type: 'finish',
       reason: { kind: 'error', failure: { message: 'synthetic provider failure', code: 'SYNTHETIC' } },
     }
+  }
+}
+
+function toolCall(name: string, id: string, args: Record<string, unknown>): StreamChunk[] {
+  const callId = CallId(id)
+  const argumentsJson = JSON.stringify(args)
+  return [
+    { type: 'block-start', index: 0, blockType: 'tool-call' },
+    { type: 'tool-call-delta', index: 0, id: callId, name, argumentsDelta: argumentsJson },
+    {
+      type: 'block-end',
+      index: 0,
+      block: { type: 'tool-call', id: callId, name, arguments: argumentsJson },
+    },
+    { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } },
+    { type: 'finish', reason: { kind: 'tool-calls' } },
+  ]
+}
+
+class ArtifactLifecycleAdapter extends LlmAdapter {
+  private readonly responses: StreamChunk[][] = [
+    toolCall('memory_artifact_record', 'artifact-record', {
+      source_path: 'C:\\private\\rlm\\exports\\synthetic-secret.bin',
+      title: 'ARTIFACT_INPUT_MARKER',
+    }),
+    toolCall('memory_artifact_resolve', 'artifact-resolve', {
+      experiment_id: 'exp_artifact_input_marker',
+    }),
+    [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'Artifact verification completed.' },
+      {
+        type: 'block-end',
+        index: 0,
+        block: { type: 'text', text: 'Artifact verification completed.' },
+      },
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ],
+  ]
+
+  async *stream(): AsyncIterable<StreamChunk> {
+    const response = this.responses.shift()
+    if (response === undefined) throw new Error('artifact lifecycle script exhausted')
+    for (const chunk of response) yield chunk
   }
 }
 
@@ -205,5 +252,85 @@ describe('real pinned DSH lifecycle integration', () => {
     ])
     await first.dispose()
     await second.dispose()
+  })
+
+  it('excludes artifact tool arguments, results, byte markers, and resolved paths from lifecycle capture', async () => {
+    const { ctx, honcho } = await harness({ recall: false })
+    ctx.effect(() =>
+      ctx.tools.register(
+        defineTool({
+          name: 'memory_artifact_record',
+          description: 'Synthetic lifecycle exclusion probe.',
+          parameters: {
+            source_path: { type: 'string', required: true },
+            title: { type: 'string', required: true },
+          },
+          output: {
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                experiment_id: { type: 'string', required: true },
+                byte_marker: { type: 'string', required: true },
+              },
+            },
+            render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+          },
+          isConcurrencySafe: () => true,
+          execute: () =>
+            Promise.resolve({
+              experiment_id: 'exp_artifact_output_marker',
+              byte_marker: 'ARTIFACT_BYTE_MARKER',
+            }),
+        }),
+      ),
+    )
+    ctx.effect(() =>
+      ctx.tools.register(
+        defineTool({
+          name: 'memory_artifact_resolve',
+          description: 'Synthetic lifecycle resolved-path probe.',
+          parameters: {
+            experiment_id: { type: 'string', required: true },
+          },
+          output: {
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                path: { type: 'string', required: true },
+              },
+            },
+            render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+          },
+          isConcurrencySafe: () => true,
+          execute: () => Promise.resolve({ path: 'C:\\private\\objects\\resolved-secret.bin' }),
+        }),
+      ),
+    )
+    ctx.llm.registerAdapter(['artifact-script'], new ArtifactLifecycleAdapter())
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('artifact-lifecycle-session'),
+      agentOptions: { provider: 'artifact-script', model: 'artifact-script' },
+    })
+    handle.agent.followup(
+      createUserMessage({
+        content: [{ type: 'text', text: 'Verify the selected historical experiment.' }],
+        source: { kind: 'user' },
+      }),
+    )
+    await handle.agent.whenIdle()
+    await settle()
+
+    const eventText = JSON.stringify(handle.agent.session.events)
+    expect(eventText).toContain('ARTIFACT_INPUT_MARKER')
+    expect(eventText).toContain('ARTIFACT_BYTE_MARKER')
+    expect(eventText).toContain('resolved-secret.bin')
+    const captured = JSON.stringify(honcho.records)
+    expect(captured).toContain('Artifact verification completed.')
+    expect(captured).not.toMatch(
+      /ARTIFACT_INPUT_MARKER|ARTIFACT_BYTE_MARKER|synthetic-secret\.bin|resolved-secret\.bin|exp_artifact_/,
+    )
+    await handle.dispose()
   })
 })

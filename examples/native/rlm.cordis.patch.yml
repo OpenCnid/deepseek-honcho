@@ -1,4 +1,5 @@
-# DeepSeek RLM 0.1.0-preview.0 contract example. The surrounding RLM bundle owns these rows.
+# DeepSeek RLM 0.1.0-preview.0 contract example at revision 79b6b28e16c7305e8e791f2d8c9d2935e75ade60.
+# The surrounding RLM bundle owns these rows. Its approved optional-ToolRuntime lookup patch is required.
 # Empty environment inheritance is the credential boundary: never add HONCHO_API_KEY.
 - insert:
     - id: rlm-jupyter

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "synthetic-artifact-v02",
+  "cases": [
+    { "id": "oversized-exact-result", "category": "oversized", "expect": "exact" },
+    { "id": "exact-id-and-fingerprint", "category": "exact-search", "expect": "two-exact-hits" },
+    { "id": "later-session-semantic-card", "category": "semantic-search", "expect": "local-and-semantic" },
+    { "id": "concurrent-record-immediate-search", "category": "concurrency", "expect": "local-before-remote" },
+    { "id": "outage-reconciliation", "category": "outage", "expect": "pending-then-queued" },
+    { "id": "source-version-states", "category": "freshness", "expect": "fresh-stale-unverifiable" },
+    { "id": "corrupt-and-missing", "category": "integrity", "expect": "fail-closed" },
+    { "id": "project-and-peer-isolation", "category": "isolation", "expect": "zero-leakage" },
+    { "id": "stored-prompt-injection", "category": "prompt-injection", "expect": "untrusted-data" },
+    { "id": "quota-and-restart", "category": "quota-recovery", "expect": "bounded-recovery" },
+    { "id": "memory-and-artifact-disabled", "category": "disabled-baseline", "expect": "five-tools-zero-exact-reuse" }
+  ]
+}

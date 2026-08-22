@@ -11,6 +11,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import HonchoSdkMemory, { type Config as ProviderConfig } from '@deepseek-honcho/dsh-honcho-sdk'
+import ArtifactMemory, { type ArtifactMemoryConfig } from '@deepseek-honcho/dsh-artifact-memory'
 import * as agentMemory from '@deepseek-honcho/dsh-agent-memory'
 import * as toolMemory from '@deepseek-honcho/dsh-tool-memory'
 
@@ -21,6 +22,8 @@ export interface Config {
   readonly provider: ProviderConfig
   /** Automatic capture/recall policy. Both modes default off. */
   readonly agentMemory?: agentMemory.Config
+  /** Optional exact artifact memory; omitted and disabled by default. */
+  readonly artifactMemory?: ArtifactMemoryConfig | false
   /** Five model tools, all enabled when this Consumer is mounted. */
   readonly tools?: toolMemory.Config | false
 }
@@ -28,11 +31,35 @@ export interface Config {
 export const Config: z<Config> = z.object({
   provider: HonchoSdkMemory.Config.required(),
   agentMemory: agentMemory.Config,
+  artifactMemory: z.union([z.const(false), ArtifactMemory.Config]),
   tools: z.union([z.const(false), toolMemory.Config]),
 })
 
 export function apply(ctx: Context, config: Config): void {
   ctx.plugin(HonchoSdkMemory, config.provider)
+  if (config.artifactMemory !== false && config.artifactMemory?.enabled === true) {
+    if (
+      config.artifactMemory.projectId !== undefined &&
+      config.artifactMemory.projectId !== config.provider.projectId
+    ) {
+      throw new TypeError('deepseek-honcho: artifact projectId must match the provider projectId')
+    }
+    if (
+      config.artifactMemory.assistantPeerId !== undefined &&
+      config.artifactMemory.assistantPeerId !== config.provider.assistantPeerId
+    ) {
+      throw new TypeError('deepseek-honcho: artifact assistantPeerId must match the provider assistantPeerId')
+    }
+    if (config.tools === false || config.tools?.search === false) {
+      throw new TypeError('deepseek-honcho: enabled artifact memory requires memory_search')
+    }
+    ctx.plugin(ArtifactMemory, {
+      ...config.artifactMemory,
+      projectId: config.provider.projectId,
+      ...(config.provider.assistantPeerId === undefined ? {} : { assistantPeerId: config.provider.assistantPeerId }),
+      honchoStateRoot: config.provider.stateRoot,
+    })
+  }
   ctx.plugin(agentMemory, config.agentMemory ?? { capture: 'off', recall: 'off' })
   if (config.tools !== false) ctx.plugin(toolMemory, config.tools ?? {})
 }

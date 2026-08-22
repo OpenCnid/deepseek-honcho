@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-honcho/dsh-honcho-bundle",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Composable native Honcho memory bundle for DeepSeek Harness",
   "type": "module",
   "license": "Apache-2.0",
@@ -21,6 +21,7 @@
   ],
   "dependencies": {
     "@deepseek-honcho/dsh-agent-memory": "workspace:^",
+    "@deepseek-honcho/dsh-artifact-memory": "workspace:^",
     "@deepseek-honcho/dsh-honcho": "workspace:^",
     "@deepseek-honcho/dsh-honcho-sdk": "workspace:^",
     "@deepseek-honcho/dsh-tool-memory": "workspace:^"

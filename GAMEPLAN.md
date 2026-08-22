@@ -172,3 +172,16 @@ No host patch should be added unless implementation proves that the public DSH l
 9. hosted/self-hosted canary and evaluation report.
 
 The normative details and Definition of Done are in [`SPEC.md`](./SPEC.md).
+
+## 11. v0.2 artifact-memory extension
+
+The implemented v0.1 lifecycle and tool integration remains the baseline. v0.2 adds one optional package rather than widening Honcho into an object store or creating another memory runtime:
+
+- DSH continues to own caller/session/project authority, policy, ToolRuntime, lifecycle, and logging.
+- RLM continues to own the persistent Python kernel and deliberate computation/slicing. Its session `exports/` directory is the sole ingest source.
+- `@deepseek-honcho/dsh-artifact-memory` owns streamed immutable local bytes, deterministic cards, integrity, exact resolution, sanitized card projection, and pending reconciliation.
+- Honcho receives only bounded assistant-attributed experiment cards and supplies semantic discovery; it never owns exact bytes or local truth.
+
+The rollout order is Milestone 8 contracts/store, Milestone 9 sanitized indexing/reconciliation, Milestone 10 DSH tools/hybrid search/real RLM bridge, then Milestone 11 evaluation, documentation, packaging, and release gates. Artifact memory remains off unless the bundle receives `artifactMemory.enabled: true` plus explicit record/resolve tool enablement. Disabled installations keep the original five tools unchanged.
+
+The first real pinned bridge run exposed one RLM defect: its optional tools adapter checked `ctx.get('tools')` at startup but later dereferenced undeclared `ctx.tools` from the provider fiber. The user approved the narrow upstream-ready correction recorded in `SPEC.md`: both dispatch sites use the live optional-service lookup and have a real nested-call regression. No DSH source change or broader RLM responsibility change is needed.

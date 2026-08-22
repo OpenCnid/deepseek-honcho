@@ -133,6 +133,16 @@ async function fakeApi(): Promise<{ baseURL: string; calls: Call[] }> {
             human_peer_id: 'human',
             role: 'correction',
             supersedes: 'old-source',
+            content_classification: 'experiment-card',
+            remote_card_schema_version: 1,
+            experiment_id: 'exp_wrong_role',
+            artifact_id: 'art_wrong_role',
+            query_fingerprint: 'a'.repeat(64),
+            source_version: 'v1',
+            source_label: 'synthetic',
+            title: 'wrong role card',
+            summary: 'must remain an ordinary correction',
+            projection_revision: 1,
           },
           created_at: createdAt,
           token_count: 1,
@@ -143,7 +153,21 @@ async function fakeApi(): Promise<{ baseURL: string; calls: Call[] }> {
           peer_id: 'assistant',
           session_id: honchoSessionId('root'),
           workspace_id: 'ws',
-          metadata: { project_id: 'project', human_peer_id: 'human', role: 'assistant' },
+          metadata: {
+            project_id: 'project',
+            human_peer_id: 'human',
+            role: 'experiment-card',
+            content_classification: 'experiment-card',
+            remote_card_schema_version: 1,
+            experiment_id: 'exp_synthetic',
+            artifact_id: 'art_synthetic',
+            query_fingerprint: 'b'.repeat(64),
+            source_version: 'v1',
+            source_label: 'synthetic',
+            title: 'synthetic experiment',
+            summary: 'bounded synthetic result',
+            projection_revision: 1,
+          },
           created_at: createdAt,
           token_count: 1,
         },
@@ -198,6 +222,12 @@ describe('@honcho-ai/sdk@2.3.0 exact adapter calls', () => {
       'corrected synthetic result',
       'assistant-authored project decision',
     ])
+    expect(search[0]?.experimentCard).toBeUndefined()
+    expect(search[1]?.experimentCard).toMatchObject({
+      experimentId: 'exp_synthetic',
+      artifactId: 'art_synthetic',
+      projectId: 'project',
+    })
 
     expect(api.calls.every((call) => call.authorization === 'Bearer synthetic-sdk-key')).toBe(true)
     expect(api.calls).toContainEqual(

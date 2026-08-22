@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-honcho/dsh-tool-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Five bounded memory tools governed and logged by DeepSeek Harness",
   "type": "module",
   "license": "Apache-2.0",
@@ -22,11 +22,20 @@
   "dependencies": {
     "@deepseek-honcho/dsh-honcho": "workspace:^"
   },
+  "devDependencies": {
+    "@deepseek-honcho/dsh-artifact-memory": "workspace:^"
+  },
   "peerDependencies": {
+    "@deepseek-honcho/dsh-artifact-memory": "0.2.0",
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-agent": "0.1.0-rc.7",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.7",
     "@deepseek-ai/schemastery": "3.18.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-honcho/dsh-artifact-memory": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "tsc -b",

@@ -36,7 +36,13 @@
       "revision": "79b6b28e16c7305e8e791f2d8c9d2935e75ade60",
       "version": "0.1.0-preview.0",
       "license": "MIT",
-      "use": "Contract research for the dsh_tools.call bridge; no runtime dependency or copied source",
+      "use": "Pinned integration target for the session filesystem, snapshot bounds, kernel environment, and dsh_tools.call bridge; no package dependency or copied source",
+      "approvedLocalChange": {
+        "status": "uncommitted-upstream-ready-patch",
+        "reason": "A real pinned provider test failed because the optional tools adapter dereferenced ctx.tools without Cordis injection",
+        "scope": "Use ctx.get('tools') at dsh_tools.list and dsh_tools.call dispatch, return ADAPTER_UNAVAILABLE when absent, and add one real nested-call regression test",
+        "specSection": "26 and 35.13"
+      },
       "copiedSource": false
     }
   ],
@@ -47,6 +53,8 @@
     "packages/core/agent/src/runtime-types.ts",
     "packages/core/session/src/types.ts",
     "packages/core/tools/src/schema.ts",
+    "packages/core/tools/src/index.ts",
+    "packages/core/tools/tests/tools.spec.ts",
     "mcp/README.md",
     "skills/honcho-memory/SKILL.md",
     "sdks/typescript/package.json",
@@ -54,6 +62,12 @@
     "sdks/typescript/src/session.ts",
     "sdks/typescript/src/peer.ts",
     "deepseek-rlm/packages/rlm-jupyter/src/host.ts",
-    "deepseek-rlm/packages/tool-ipython/src/index.ts"
+    "deepseek-rlm/packages/rlm-jupyter/src/config.ts",
+    "deepseek-rlm/packages/rlm-jupyter/src/index.ts",
+    "deepseek-rlm/packages/rlm-jupyter/src/snapshot.ts",
+    "deepseek-rlm/packages/rlm-jupyter/tests/provider.integration.spec.ts",
+    "deepseek-rlm/packages/tool-ipython/src/index.ts",
+    "deepseek-rlm/python/dsh-rlm-runtime/src/dsh_tools/__init__.py",
+    "deepseek-rlm/LICENSE"
   ]
 }
