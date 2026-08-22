@@ -293,9 +293,19 @@ describe('delivery worker', () => {
     await outbox.enqueue(request('a2', 'session-a'))
     await outbox.enqueue(request('b1', 'session-b'))
     const remote = new FakeRemote()
-    remote.delay = async () => new Promise((resolvePromise) => setTimeout(resolvePromise, 10))
+    let releaseRemote!: () => void
+    const remoteGate = new Promise<void>((resolvePromise) => {
+      releaseRemote = resolvePromise
+    })
+    remote.delay = async () => remoteGate
     const worker = new DeliveryWorker(outbox, remote, workerConfig, async () => {})
-    expect(await worker.drainOnce()).toBe(2)
+    const draining = worker.drainOnce()
+    try {
+      await expect.poll(() => remote.active).toBe(2)
+    } finally {
+      releaseRemote()
+    }
+    expect(await draining).toBe(2)
     expect(remote.maximumActive).toBe(2)
     expect(await outbox.listPending()).toHaveLength(1)
     await worker.drainOnce()
