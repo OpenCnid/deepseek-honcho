@@ -265,6 +265,7 @@ del _record, _source, _exports, _target_bytes, _remaining, _chunk, _part, _strea
         experimentCard: remoteCard,
       },
     ])
+    await later.ctx.artifactMemory.store.initializeReady()
     expect(later.ctx.artifactMemory.store.cardsSnapshot()).toHaveLength(1)
     const searchOutput = await ipython(
       later.ctx,
